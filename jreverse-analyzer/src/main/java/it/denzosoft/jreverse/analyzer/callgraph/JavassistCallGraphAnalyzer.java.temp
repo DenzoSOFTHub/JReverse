@@ -1,0 +1,428 @@
+package it.denzosoft.jreverse.analyzer.callgraph;
+
+import it.denzosoft.jreverse.analyzer.restendpoint.JavassistRestEndpointAnalyzer;
+import it.denzosoft.jreverse.core.model.*;
+import it.denzosoft.jreverse.core.port.CallGraphAnalyzer;
+
+import javassist.*;
+import javassist.bytecode.*;
+
+import java.util.*;
+import java.util.logging.Logger;
+import java.util.stream.Collectors;
+
+/**
+ * Javassist-based implementation for analyzing call graphs and dependency chains.
+ * Builds complete call graphs from HTTP endpoints through service and data access layers.
+ */
+public class JavassistCallGraphAnalyzer implements CallGraphAnalyzer {
+    
+    private static final Logger LOGGER = Logger.getLogger(JavassistCallGraphAnalyzer.class.getName());
+    
+    private final JavassistRestEndpointAnalyzer endpointAnalyzer;
+    private final ClassPool classPool;
+    
+    public JavassistCallGraphAnalyzer(JavassistRestEndpointAnalyzer endpointAnalyzer) {
+        this.endpointAnalyzer = Objects.requireNonNull(endpointAnalyzer, 
+            "RestEndpointAnalyzer is required");
+        this.classPool = ClassPool.getDefault();
+    }
+    
+    @Override
+    public CallGraphAnalysisResult analyzeCallGraphs(JarContent jarContent) {
+        LOGGER.info("Starting call graph analysis for JAR: " + jarContent.getLocation().getFileName());
+        
+        try {
+            // Add JAR to classpath
+            classPool.insertClassPath(jarContent.getLocation().toString());
+            
+            // Get REST endpoints as starting points
+            RestEndpointAnalysisResult endpointResult = endpointAnalyzer.analyzeEndpoints(jarContent);
+            
+            // Build call graphs for each endpoint
+            List<CallGraphChain> callChains = buildCallChains(endpointResult.getEndpoints(), jarContent);
+            Map<String, CallGraphNode> rootNodes = buildRootNodes(callChains);
+            
+            // Analyze for issues and hotspots
+            List<CallGraphIssue> issues = analyzeCallGraphIssues(callChains);
+            List<PerformanceHotspot> hotspots = identifyPerformanceHotspots(callChains);
+            Map<String, Integer> componentUsage = calculateComponentUsage(callChains);
+            
+            // Build summary and metrics
+            CallGraphSummary summary = buildSummary(callChains, issues, hotspots);
+            ArchitectureMetrics metrics = buildArchitectureMetrics(callChains, componentUsage);
+            
+            LOGGER.info("Call graph analysis completed. Found " + callChains.size() + 
+                       " call chains with " + issues.size() + " issues");
+            
+            return CallGraphAnalysisResult.builder()
+                .callChains(callChains)
+                .rootNodes(rootNodes)
+                .summary(summary)
+                .issues(issues)
+                .componentUsageStats(componentUsage)
+                .hotspots(hotspots)
+                .architectureMetrics(metrics)
+                .build();
+                
+        } catch (Exception e) {
+            LOGGER.severe("Error during call graph analysis: " + e.getMessage());
+            throw new RuntimeException("Failed to analyze call graphs", e);
+        }
+    }
+    
+    @Override
+    public boolean canAnalyze(JarContent jarContent) {
+        return endpointAnalyzer.canAnalyze(jarContent);
+    }
+    
+    private List<CallGraphChain> buildCallChains(List<RestEndpointInfo> endpoints, JarContent jarContent) {
+        List<CallGraphChain> chains = new ArrayList<>();
+        
+        for (RestEndpointInfo endpoint : endpoints) {
+            try {
+                CallGraphChain chain = buildCallChainForEndpoint(endpoint, jarContent);
+                if (chain != null) {
+                    chains.add(chain);
+                }
+            } catch (Exception e) {
+                LOGGER.warning("Failed to build call chain for endpoint " + endpoint.getPath() + ": " + e.getMessage());
+            }
+        }
+        
+        return chains;
+    }
+    
+    private CallGraphChain buildCallChainForEndpoint(RestEndpointInfo endpoint, JarContent jarContent) {
+        try {
+            String controllerClass = endpoint.getControllerClass();
+            String methodName = endpoint.getMethodName();
+            
+            CtClass ctClass = classPool.get(controllerClass);
+            CtMethod[] methods = ctClass.getDeclaredMethods();
+            
+            for (CtMethod method : methods) {
+                if (method.getName().equals(methodName)) {
+                    CallGraphNode rootNode = buildCallGraphNode(method, ctClass, 0);
+                    List<CallGraphNode> allNodes = collectAllNodes(rootNode);
+                    
+                    return CallGraphChain.builder()
+                        .endpoint(endpoint.getPath() + " [" + endpoint.getHttpMethod() + "]")
+                        .controllerClass(controllerClass)
+                        .controllerMethod(methodName)
+                        .rootNode(rootNode)
+                        .nodes(allNodes)
+                        .depth(calculateMaxDepth(rootNode))
+                        .totalCalls(allNodes.size())
+                        .build();
+                }
+            }
+        } catch (Exception e) {
+            LOGGER.warning("Error building call chain for " + endpoint.getPath() + ": " + e.getMessage());
+        }
+        
+        return null;
+    }
+    
+    private CallGraphNode buildCallGraphNode(CtMethod method, CtClass declaringClass, int depth) {
+        try {
+            String className = declaringClass.getName();
+            String methodName = method.getName();
+            String signature = method.getSignature();
+            
+            List<CallGraphNode> children = new ArrayList<>();
+            
+            // Limit depth to prevent infinite recursion
+            if (depth < 5) {
+                List<MethodCall> methodCalls = extractMethodCalls(method);
+                for (MethodCall call : methodCalls) {
+                    CallGraphNode childNode = resolveMethodCall(call, depth + 1);
+                    if (childNode != null) {
+                        children.add(childNode);
+                    }
+                }
+            }
+            
+            return CallGraphNode.builder()
+                .className(className)
+                .methodName(methodName)
+                .signature(signature)
+                .callType(determineCallType(className))
+                .depth(depth)
+                .children(children)
+                .isLeaf(children.isEmpty())
+                .build();
+                
+        } catch (Exception e) {
+            LOGGER.warning("Error building call graph node for " + method.getName() + ": " + e.getMessage());
+            return null;
+        }
+    }
+    
+    private List<MethodCall> extractMethodCalls(CtMethod method) {
+        List<MethodCall> calls = new ArrayList<>();
+        
+        try {
+            CodeAttribute codeAttribute = method.getMethodInfo().getCodeAttribute();
+            if (codeAttribute == null) {
+                return calls;
+            }
+            
+            ConstPool constPool = codeAttribute.getConstPool();
+            CodeIterator iterator = codeAttribute.iterator();
+            
+            while (iterator.hasNext()) {
+                int index = iterator.next();
+                int opcode = iterator.byteAt(index);
+                
+                if (opcode == Opcode.INVOKEVIRTUAL || 
+                    opcode == Opcode.INVOKEINTERFACE || 
+                    opcode == Opcode.INVOKESTATIC ||
+                    opcode == Opcode.INVOKESPECIAL) {
+                    
+                    int constIndex = iterator.u16bitAt(index + 1);
+                    try {
+                        String className = constPool.getMethodrefClassName(constIndex);
+                        String methodName = constPool.getMethodrefName(constIndex);
+                        String methodType = constPool.getMethodrefType(constIndex);
+                        
+                        // Filter out JDK calls and focus on application code
+                        if (isApplicationCode(className)) {
+                            calls.add(new MethodCall(className, methodName, methodType));
+                        }
+                    } catch (Exception e) {
+                        // Skip problematic method references
+                    }
+                }
+            }
+        } catch (Exception e) {
+            LOGGER.warning("Error extracting method calls from " + method.getName() + ": " + e.getMessage());
+        }
+        
+        return calls;
+    }
+    
+    private boolean isApplicationCode(String className) {
+        return className != null && 
+               !className.startsWith("java.") &&
+               !className.startsWith("javax.") &&
+               !className.startsWith("org.springframework.") &&
+               !className.startsWith("org.slf4j.") &&
+               !className.startsWith("org.apache.") &&
+               !className.contains("$");
+    }
+    
+    private CallGraphNode resolveMethodCall(MethodCall call, int depth) {
+        try {
+            CtClass targetClass = classPool.get(call.className);
+            CtMethod[] methods = targetClass.getDeclaredMethods();
+            
+            for (CtMethod method : methods) {
+                if (method.getName().equals(call.methodName)) {
+                    return buildCallGraphNode(method, targetClass, depth);
+                }
+            }
+        } catch (Exception e) {
+            // Class not found or method not accessible
+            LOGGER.fine("Could not resolve method call: " + call.className + "." + call.methodName);
+        }
+        
+        return null;
+    }
+    
+    private CallType determineCallType(String className) {
+        if (className.contains("Controller")) {
+            return CallType.CONTROLLER;
+        } else if (className.contains("Service")) {
+            return CallType.SERVICE;
+        } else if (className.contains("Repository")) {
+            return CallType.REPOSITORY;
+        } else if (className.contains("Component")) {
+            return CallType.COMPONENT;
+        } else {
+            return CallType.OTHER;
+        }
+    }
+    
+    private Map<String, CallGraphNode> buildRootNodes(List<CallGraphChain> chains) {
+        Map<String, CallGraphNode> rootNodes = new HashMap<>();
+        
+        for (CallGraphChain chain : chains) {
+            rootNodes.put(chain.getEndpoint(), chain.getRootNode());
+        }
+        
+        return rootNodes;
+    }
+    
+    private List<CallGraphNode> collectAllNodes(CallGraphNode root) {
+        List<CallGraphNode> allNodes = new ArrayList<>();
+        Set<String> visited = new HashSet<>();
+        collectNodesRecursively(root, allNodes, visited);
+        return allNodes;
+    }
+    
+    private void collectNodesRecursively(CallGraphNode node, List<CallGraphNode> allNodes, Set<String> visited) {
+        if (node == null) return;
+        
+        String nodeId = node.getClassName() + "." + node.getMethodName();
+        if (visited.contains(nodeId)) {
+            return; // Prevent cycles
+        }
+        
+        visited.add(nodeId);
+        allNodes.add(node);
+        
+        for (CallGraphNode child : node.getChildren()) {
+            collectNodesRecursively(child, allNodes, visited);
+        }
+    }
+    
+    private int calculateMaxDepth(CallGraphNode root) {
+        if (root == null || root.getChildren().isEmpty()) {
+            return root != null ? root.getDepth() : 0;
+        }
+        
+        return root.getChildren().stream()
+            .mapToInt(this::calculateMaxDepth)
+            .max()
+            .orElse(root.getDepth());
+    }
+    
+    private List<CallGraphIssue> analyzeCallGraphIssues(List<CallGraphChain> chains) {
+        List<CallGraphIssue> issues = new ArrayList<>();
+        
+        for (CallGraphChain chain : chains) {
+            // Check for excessive depth
+            if (chain.getDepth() > 10) {
+                issues.add(CallGraphIssue.builder()
+                    .type(CallGraphIssue.IssueType.EXCESSIVE_CALL_DEPTH)
+                    .severity(CallGraphIssue.Severity.WARNING)
+                    .endpoint(chain.getEndpoint())
+                    .component(chain.getControllerClass())
+                    .description("Call chain depth exceeds recommended maximum")
+                    .recommendation("Consider refactoring to reduce call depth and improve maintainability")
+                    .build());
+            }
+            
+            // Check for missing service layer
+            boolean hasServiceLayer = chain.getNodes().stream()
+                .anyMatch(node -> node.getCallType() == CallType.SERVICE);
+                
+            if (!hasServiceLayer && chain.getDepth() > 1) {
+                issues.add(CallGraphIssue.builder()
+                    .type(CallGraphIssue.IssueType.MISSING_SERVICE_LAYER)
+                    .severity(CallGraphIssue.Severity.INFO)
+                    .endpoint(chain.getEndpoint())
+                    .component(chain.getControllerClass())
+                    .description("Direct repository access from controller detected")
+                    .recommendation("Consider introducing a service layer for better separation of concerns")
+                    .build());
+            }
+        }
+        
+        return issues;
+    }
+    
+    private List<PerformanceHotspot> identifyPerformanceHotspots(List<CallGraphChain> chains) {
+        Map<String, Integer> methodCallCounts = new HashMap<>();
+        
+        // Count method call frequencies
+        for (CallGraphChain chain : chains) {
+            for (CallGraphNode node : chain.getNodes()) {
+                String methodId = node.getClassName() + "." + node.getMethodName();
+                methodCallCounts.merge(methodId, 1, Integer::sum);
+            }
+        }
+        
+        // Identify hotspots (methods called in multiple chains)
+        return methodCallCounts.entrySet().stream()
+            .filter(entry -> entry.getValue() > 3)
+            .map(entry -> PerformanceHotspot.builder()
+                .component(entry.getKey().substring(0, entry.getKey().lastIndexOf('.')))
+                .method(entry.getKey().substring(entry.getKey().lastIndexOf('.') + 1))
+                .callFrequency(entry.getValue())
+                .severity(entry.getValue() > 10 ? PerformanceHotspot.Severity.HIGH : PerformanceHotspot.Severity.MEDIUM)
+                .impact("Frequently called method - consider optimization")
+                .recommendation("Review for optimization opportunities or caching")
+                .build())
+            .collect(Collectors.toList());
+    }
+    
+    private Map<String, Integer> calculateComponentUsage(List<CallGraphChain> chains) {
+        Map<String, Integer> usage = new HashMap<>();
+        
+        for (CallGraphChain chain : chains) {
+            for (CallGraphNode node : chain.getNodes()) {
+                String component = getComponentName(node.getClassName());
+                usage.merge(component, 1, Integer::sum);
+            }
+        }
+        
+        return usage;
+    }
+    
+    private String getComponentName(String className) {
+        if (className == null) return "Unknown";
+        int lastDot = className.lastIndexOf('.');
+        return lastDot >= 0 ? className.substring(lastDot + 1) : className;
+    }
+    
+    private CallGraphSummary buildSummary(List<CallGraphChain> chains, 
+                                        List<CallGraphIssue> issues, 
+                                        List<PerformanceHotspot> hotspots) {
+        
+        int totalNodes = chains.stream().mapToInt(CallGraphChain::getTotalCalls).sum();
+        double avgDepth = chains.stream().mapToInt(CallGraphChain::getDepth).average().orElse(0.0);
+        int maxDepth = chains.stream().mapToInt(CallGraphChain::getDepth).max().orElse(0);
+        
+        return CallGraphSummary.builder()
+            .totalEndpoints(chains.size())
+            .totalCallChains(chains.size())
+            .totalNodes(totalNodes)
+            .averageDepth(avgDepth)
+            .maxDepth(maxDepth)
+            .totalIssues(issues.size())
+            .hotspotCount(hotspots.size())
+            .hasServiceLayer(chains.stream().anyMatch(chain -> 
+                chain.getNodes().stream().anyMatch(node -> node.getCallType() == CallType.SERVICE)))
+            .hasRepositoryLayer(chains.stream().anyMatch(chain -> 
+                chain.getNodes().stream().anyMatch(node -> node.getCallType() == CallType.REPOSITORY)))
+            .build();
+    }
+    
+    private ArchitectureMetrics buildArchitectureMetrics(List<CallGraphChain> chains, 
+                                                        Map<String, Integer> componentUsage) {
+        
+        long controllerCount = componentUsage.entrySet().stream()
+            .filter(entry -> entry.getKey().contains("Controller"))
+            .count();
+            
+        long serviceCount = componentUsage.entrySet().stream()
+            .filter(entry -> entry.getKey().contains("Service"))
+            .count();
+            
+        long repositoryCount = componentUsage.entrySet().stream()
+            .filter(entry -> entry.getKey().contains("Repository"))
+            .count();
+        
+        return ArchitectureMetrics.builder()
+            .controllerCount((int) controllerCount)
+            .serviceCount((int) serviceCount)
+            .repositoryCount((int) repositoryCount)
+            .totalComponents(componentUsage.size())
+            .layeredArchitecture(controllerCount > 0 && serviceCount > 0 && repositoryCount > 0)
+            .build();
+    }
+    
+    private static class MethodCall {
+        final String className;
+        final String methodName;
+        final String methodType;
+        
+        MethodCall(String className, String methodName, String methodType) {
+            this.className = className;
+            this.methodName = methodName;
+            this.methodType = methodType;
+        }
+    }
+}

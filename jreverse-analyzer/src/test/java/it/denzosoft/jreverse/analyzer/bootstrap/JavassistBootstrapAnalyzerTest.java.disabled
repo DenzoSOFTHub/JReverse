@@ -1,0 +1,388 @@
+package it.denzosoft.jreverse.analyzer.bootstrap;
+
+import it.denzosoft.jreverse.analyzer.beancreation.BeanCreationAnalyzer;
+import it.denzosoft.jreverse.analyzer.beancreation.BeanCreationResult;
+import it.denzosoft.jreverse.analyzer.beancreation.BeanInfo;
+import it.denzosoft.jreverse.analyzer.componentscan.ComponentScanAnalyzer;
+import it.denzosoft.jreverse.analyzer.componentscan.ComponentScanAnalysisResult;
+import it.denzosoft.jreverse.analyzer.mainmethod.MainMethodAnalysisResult;
+import it.denzosoft.jreverse.analyzer.mainmethod.MainMethodAnalyzer;
+import it.denzosoft.jreverse.analyzer.mainmethod.MainMethodInfo;
+import it.denzosoft.jreverse.core.model.AnnotationInfo;
+import it.denzosoft.jreverse.core.model.ClassInfo;
+import it.denzosoft.jreverse.core.model.ClassType;
+import it.denzosoft.jreverse.core.model.JarContent;
+import it.denzosoft.jreverse.core.model.JarLocation;
+import it.denzosoft.jreverse.core.model.JarType;
+import it.denzosoft.jreverse.core.model.MethodInfo;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+
+import java.util.List;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.when;
+
+/**
+ * Test class for JavassistBootstrapAnalyzer.
+ */
+@ExtendWith(MockitoExtension.class)
+class JavassistBootstrapAnalyzerTest {
+    
+    @Mock
+    private MainMethodAnalyzer mockMainMethodAnalyzer;
+    
+    @Mock
+    private ComponentScanAnalyzer mockComponentScanAnalyzer;
+    
+    @Mock
+    private BeanCreationAnalyzer mockBeanCreationAnalyzer;
+    
+    private JarLocation testJarLocation;
+    
+    @Mock
+    private ClassInfo mockMainClass;
+    
+    @Mock
+    private MethodInfo mockMainMethod;
+    
+    @Mock
+    private MainMethodInfo mockMainMethodInfo;
+    
+    private JavassistBootstrapAnalyzer analyzer;
+    
+    @BeforeEach
+    void setUp() {
+        analyzer = new JavassistBootstrapAnalyzer(mockMainMethodAnalyzer, mockComponentScanAnalyzer, mockBeanCreationAnalyzer);
+        
+        // Setup test jar location
+        testJarLocation = new JarLocation(java.nio.file.Paths.get("test-app.jar"));
+        
+        // Setup analyzers to be able to analyze
+        when(mockMainMethodAnalyzer.canAnalyze(any())).thenReturn(true);
+        when(mockComponentScanAnalyzer.canAnalyze(any())).thenReturn(true);
+        when(mockBeanCreationAnalyzer.canAnalyze(any())).thenReturn(true);
+    }
+    
+    @Test
+    void shouldReturnErrorForNullJarContent() {
+        BootstrapAnalysisResult result = analyzer.analyzeBootstrap(null);
+        
+        assertThat(result.getAnalysisType()).isEqualTo(BootstrapAnalysisResult.BootstrapAnalysisType.ANALYSIS_ERROR);
+        assertThat(result.getMetadata().hasErrors()).isTrue();
+    }
+    
+    @Test
+    void shouldReturnErrorForEmptyJarContent() {
+        when(mockJarContent.getClassCount()).thenReturn(0);
+        
+        BootstrapAnalysisResult result = analyzer.analyzeBootstrap(mockJarContent);
+        
+        assertThat(result.getAnalysisType()).isEqualTo(BootstrapAnalysisResult.BootstrapAnalysisType.ANALYSIS_ERROR);
+        assertThat(result.getMetadata().hasErrors()).isTrue();
+    }
+    
+    @Test
+    void shouldReturnRegularJavaApplicationForNonSpringBootApp() {
+        // Setup non-Spring Boot application
+        when(mockMainClass.getAnnotations()).thenReturn(java.util.Set.of());
+        
+        MainMethodAnalysisResult mainMethodResult = MainMethodAnalysisResult.regularMain(mockMainMethodInfo);
+        when(mockMainMethodAnalyzer.analyzeMainMethod(mockJarContent)).thenReturn(mainMethodResult);
+        
+        BootstrapAnalysisResult result = analyzer.analyzeBootstrap(mockJarContent);
+        
+        assertThat(result.getAnalysisType()).isEqualTo(BootstrapAnalysisResult.BootstrapAnalysisType.REGULAR_JAVA);
+        assertThat(result.getMainMethodAnalysis()).isPresent().contains(mainMethodResult);
+        assertThat(result.hasMainMethod()).isTrue();
+    }
+    
+    @Test
+    void shouldReturnNoBootstrapForRegularAppWithoutMainMethod() {
+        // Setup non-Spring Boot application without main method
+        when(mockMainClass.getAnnotations()).thenReturn(java.util.Set.of());
+        
+        MainMethodAnalysisResult noMainResult = MainMethodAnalysisResult.noMainFound();
+        when(mockMainMethodAnalyzer.analyzeMainMethod(mockJarContent)).thenReturn(noMainResult);
+        
+        BootstrapAnalysisResult result = analyzer.analyzeBootstrap(mockJarContent);
+        
+        assertThat(result.getAnalysisType()).isEqualTo(BootstrapAnalysisResult.BootstrapAnalysisType.NO_BOOTSTRAP);
+        assertThat(result.hasMainMethod()).isFalse();
+    }
+    
+    @Test
+    void shouldAnalyzeSpringBootApplicationSuccessfully() {
+        // Setup Spring Boot application
+        AnnotationInfo springBootAnnotation = AnnotationInfo.simple("org.springframework.boot.autoconfigure.SpringBootApplication");
+        when(mockMainClass.getAnnotations()).thenReturn(java.util.Set.of(springBootAnnotation));
+        when(mockMainClass.getFullyQualifiedName()).thenReturn("com.example.Application");
+        when(mockMainClass.getClassType()).thenReturn(ClassType.CLASS);
+        
+        // Setup main method analysis
+        when(mockMainMethodInfo.getDeclaringClass()).thenReturn(mockMainClass);
+        when(mockMainMethodInfo.getMethodInfo()).thenReturn(mockMainMethod);
+        when(mockMainMethodInfo.getClassName()).thenReturn("com.example.Application");
+        when(mockMainMethod.getName()).thenReturn("main");
+        when(mockMainMethod.getParameters()).thenReturn(List.of());
+        
+        MainMethodAnalysisResult springMainResult = MainMethodAnalysisResult.regularMain(mockMainMethodInfo);
+        when(mockMainMethodAnalyzer.analyzeMainMethod(mockJarContent)).thenReturn(springMainResult);
+        
+        // Setup component scan analysis
+        ComponentScanAnalysisResult componentScanResult = ComponentScanAnalysisResult.builder()
+            .effectivePackages(java.util.Set.of("com.example"))
+            .build();
+        when(mockComponentScanAnalyzer.analyzeComponentScan(mockJarContent)).thenReturn(componentScanResult);
+        
+        // Setup bean creation analysis
+        BeanCreationResult beanCreationResult = BeanCreationResult.success(List.of());
+        when(mockBeanCreationAnalyzer.analyzeBeanCreation(mockJarContent)).thenReturn(beanCreationResult);
+        
+        BootstrapAnalysisResult result = analyzer.analyzeBootstrap(mockJarContent);
+        
+        assertThat(result.getAnalysisType()).isEqualTo(BootstrapAnalysisResult.BootstrapAnalysisType.SPRING_BOOT);
+        assertThat(result.isSpringBootApplication()).isTrue();
+        assertThat(result.hasMainMethod()).isTrue();
+        assertThat(result.hasComponentScan()).isTrue();
+        assertThat(result.hasBeanCreation()).isTrue();
+        assertThat(result.getTotalSteps()).isGreaterThan(0);
+        assertThat(result.getTimingInfo().hasTimingData()).isTrue();
+    }
+    
+    @Test
+    void shouldReturnErrorForSpringBootAppWithoutMainMethod() {
+        // Setup Spring Boot application without main method
+        AnnotationInfo springBootAnnotation = AnnotationInfo.simple("org.springframework.boot.autoconfigure.SpringBootApplication");
+        when(mockMainClass.getAnnotations()).thenReturn(java.util.Set.of(springBootAnnotation));
+        
+        MainMethodAnalysisResult noMainResult = MainMethodAnalysisResult.noMainFound();
+        when(mockMainMethodAnalyzer.analyzeMainMethod(mockJarContent)).thenReturn(noMainResult);
+        
+        BootstrapAnalysisResult result = analyzer.analyzeBootstrap(mockJarContent);
+        
+        assertThat(result.getAnalysisType()).isEqualTo(BootstrapAnalysisResult.BootstrapAnalysisType.ANALYSIS_ERROR);
+        assertThat(result.getMetadata().hasErrors()).isTrue();
+        assertThat(result.getMetadata().getMessage()).contains("No main method found");
+    }
+    
+    @Test
+    void shouldHandleAnalysisExceptions() {
+        // Setup Spring Boot application
+        AnnotationInfo springBootAnnotation = AnnotationInfo.simple("org.springframework.boot.autoconfigure.SpringBootApplication");
+        when(mockMainClass.getAnnotations()).thenReturn(java.util.Set.of(springBootAnnotation));
+        
+        // Make main method analyzer throw exception
+        when(mockMainMethodAnalyzer.analyzeMainMethod(mockJarContent))
+            .thenThrow(new RuntimeException("Analysis failed"));
+        
+        BootstrapAnalysisResult result = analyzer.analyzeBootstrap(mockJarContent);
+        
+        assertThat(result.getAnalysisType()).isEqualTo(BootstrapAnalysisResult.BootstrapAnalysisType.ANALYSIS_ERROR);
+        assertThat(result.getMetadata().hasErrors()).isTrue();
+        assertThat(result.getMetadata().getMessage()).contains("Analysis failed");
+    }
+    
+    @Test
+    void shouldCorrectlyIdentifySpringBootApplicationByAnnotation() {
+        // Test @SpringBootApplication
+        AnnotationInfo springBootApp = AnnotationInfo.simple("org.springframework.boot.autoconfigure.SpringBootApplication");
+        when(mockMainClass.getAnnotations()).thenReturn(java.util.Set.of(springBootApp));
+        
+        assertThat(analyzer.isSpringBootApplication(mockJarContent)).isTrue();
+        
+        // Test @EnableAutoConfiguration
+        AnnotationInfo enableAutoConfig = AnnotationInfo.simple("org.springframework.boot.autoconfigure.EnableAutoConfiguration");
+        when(mockMainClass.getAnnotations()).thenReturn(java.util.Set.of(enableAutoConfig));
+        
+        assertThat(analyzer.isSpringBootApplication(mockJarContent)).isTrue();
+    }
+    
+    @Test
+    void shouldCorrectlyIdentifySpringBootApplicationByDependencies() {
+        // Setup jar with Spring Boot classes but no annotations on main class
+        when(mockMainClass.getAnnotations()).thenReturn(java.util.Set.of());
+        
+        ClassInfo springAppClass = ClassInfo.builder()
+            .fullyQualifiedName("org.springframework.boot.SpringApplication")
+            .classType(ClassType.CLASS)
+            .build();
+        when(mockJarContent.getClasses()).thenReturn(java.util.Set.of(mockMainClass, springAppClass));
+        
+        assertThat(analyzer.isSpringBootApplication(mockJarContent)).isTrue();
+    }
+    
+    @Test
+    void shouldReturnFalseForNonSpringBootApplication() {
+        when(mockMainClass.getAnnotations()).thenReturn(java.util.Set.of());
+        when(mockMainClass.getFullyQualifiedName()).thenReturn("com.example.RegularApp");
+        
+        assertThat(analyzer.isSpringBootApplication(mockJarContent)).isFalse();
+    }
+    
+    @Test
+    void shouldUseDefaultConstructor() {
+        JavassistBootstrapAnalyzer defaultAnalyzer = new JavassistBootstrapAnalyzer();
+        
+        // Should not throw exceptions when created with default constructor
+        assertThat(defaultAnalyzer).isNotNull();
+    }
+    
+    @Test
+    void canAnalyzeShouldReturnTrueForValidJarContent() {
+        assertThat(analyzer.canAnalyze(mockJarContent)).isTrue();
+    }
+    
+    @Test
+    void canAnalyzeShouldReturnFalseForNullJarContent() {
+        assertThat(analyzer.canAnalyze(null)).isFalse();
+    }
+    
+    @Test
+    void canAnalyzeShouldReturnFalseForEmptyJarContent() {
+        when(mockJarContent.getClassCount()).thenReturn(0);
+        assertThat(analyzer.canAnalyze(mockJarContent)).isFalse();
+    }
+    
+    @Test
+    void canAnalyzeShouldReturnFalseWhenSubAnalyzersCantAnalyze() {
+        when(mockMainMethodAnalyzer.canAnalyze(any())).thenReturn(false);
+        
+        assertThat(analyzer.canAnalyze(mockJarContent)).isFalse();
+    }
+    
+    @Test
+    void shouldBuildSequenceStepsForSpringBootApplication() {
+        // Setup Spring Boot application with all analysis results
+        setupSpringBootApplication();
+        
+        BootstrapAnalysisResult result = analyzer.analyzeBootstrap(mockJarContent);
+        
+        assertThat(result.getSequenceSteps()).isNotEmpty();
+        
+        // Verify we have steps from different phases
+        boolean hasMainMethodPhase = result.getSequenceSteps().stream()
+            .anyMatch(step -> step.getPhase() == BootstrapSequencePhase.MAIN_METHOD_EXECUTION);
+        boolean hasContextPreparationPhase = result.getSequenceSteps().stream()
+            .anyMatch(step -> step.getPhase() == BootstrapSequencePhase.CONTEXT_PREPARATION);
+        boolean hasApplicationReadyPhase = result.getSequenceSteps().stream()
+            .anyMatch(step -> step.getPhase() == BootstrapSequencePhase.APPLICATION_READY);
+        
+        assertThat(hasMainMethodPhase).isTrue();
+        assertThat(hasContextPreparationPhase).isTrue();
+        assertThat(hasApplicationReadyPhase).isTrue();
+    }
+    
+    @Test
+    void shouldExtractComponentsFromBeanCreationResult() {
+        setupSpringBootApplication();
+        
+        // Setup bean creation result with various bean types
+        List<BeanInfo> beans = List.of(
+            createMockBeanInfo("com.example.service.UserService"),
+            createMockBeanInfo("com.example.repository.UserRepository"),
+            createMockBeanInfo("com.example.controller.UserController"),
+            createMockBeanInfo("com.example.config.AppConfig")
+        );
+        
+        BeanCreationResult beanCreationResult = BeanCreationResult.success(beans);
+        when(mockBeanCreationAnalyzer.analyzeBeanCreation(mockJarContent)).thenReturn(beanCreationResult);
+        
+        BootstrapAnalysisResult result = analyzer.analyzeBootstrap(mockJarContent);
+        
+        assertThat(result.getComponentCount()).isGreaterThan(0);
+        assertThat(result.getDiscoveredComponents()).containsAnyOf(
+            "com.example.service.UserService",
+            "com.example.repository.UserRepository",
+            "com.example.controller.UserController",
+            "com.example.config.AppConfig"
+        );
+    }
+    
+    @Test
+    void shouldExtractAutoConfigurationsFromJarContent() {
+        setupSpringBootApplication();
+        
+        // Add auto-configuration class to jar content
+        ClassInfo autoConfigClass = ClassInfo.builder()
+            .fullyQualifiedName("com.example.config.WebAutoConfiguration")
+            .classType(ClassType.CLASS)
+            .addAnnotation(AnnotationInfo.simple("org.springframework.boot.autoconfigure.AutoConfiguration"))
+            .build();
+        when(mockJarContent.getClasses()).thenReturn(java.util.Set.of(mockMainClass, autoConfigClass));
+        
+        BootstrapAnalysisResult result = analyzer.analyzeBootstrap(mockJarContent);
+        
+        assertThat(result.getAutoConfigurationCount()).isGreaterThan(0);
+        assertThat(result.getDetectedAutoConfigurations())
+            .contains("com.example.config.WebAutoConfiguration");
+    }
+    
+    private void setupSpringBootApplication() {
+        AnnotationInfo springBootAnnotation = AnnotationInfo.simple("org.springframework.boot.autoconfigure.SpringBootApplication");
+        when(mockMainClass.getAnnotations()).thenReturn(java.util.Set.of(springBootAnnotation));
+        when(mockMainClass.getFullyQualifiedName()).thenReturn("com.example.Application");
+        when(mockMainClass.getClassType()).thenReturn(ClassType.CLASS);
+        
+        // Setup main method analysis
+        when(mockMainMethodInfo.getDeclaringClass()).thenReturn(mockMainClass);
+        when(mockMainMethodInfo.getMethodInfo()).thenReturn(mockMainMethod);
+        when(mockMainMethodInfo.getClassName()).thenReturn("com.example.Application");
+        when(mockMainMethod.getName()).thenReturn("main");
+        when(mockMainMethod.getParameters()).thenReturn(List.of());
+        
+        MainMethodAnalysisResult springMainResult = MainMethodAnalysisResult.regularMain(mockMainMethodInfo);
+        when(mockMainMethodAnalyzer.analyzeMainMethod(mockJarContent)).thenReturn(springMainResult);
+        
+        // Setup component scan analysis
+        ComponentScanAnalysisResult componentScanResult = ComponentScanAnalysisResult.builder()
+            .effectivePackages(java.util.Set.of("com.example"))
+            .build();
+        when(mockComponentScanAnalyzer.analyzeComponentScan(mockJarContent)).thenReturn(componentScanResult);
+        
+        // Setup bean creation analysis
+        BeanCreationResult beanCreationResult = BeanCreationResult.success(List.of());
+        when(mockBeanCreationAnalyzer.analyzeBeanCreation(mockJarContent)).thenReturn(beanCreationResult);
+    }
+    
+    private BeanInfo createMockBeanInfo(String className) {
+        // This would need to match the actual BeanInfo constructor/factory method
+        // For now, we'll assume it exists and return null - this would need to be
+        // updated based on the actual BeanInfo implementation
+        return null; // Placeholder - would need actual BeanInfo creation
+    }
+    
+    private JarContent createJarContent(ClassInfo... classes) {
+        return JarContent.builder()
+            .location(testJarLocation)
+            .classes(java.util.Set.of(classes))
+            .build();
+    }
+    
+    private ClassInfo createSpringBootMainClass(String className) {
+        return ClassInfo.builder()
+            .fullyQualifiedName(className)
+            .classType(ClassType.CLASS)
+            .addAnnotation(AnnotationInfo.simple("org.springframework.boot.autoconfigure.SpringBootApplication"))
+            .build();
+    }
+    
+    private ClassInfo createRegularClass(String className) {
+        return ClassInfo.builder()
+            .fullyQualifiedName(className)
+            .classType(ClassType.CLASS)
+            .build();
+    }
+    
+    private ClassInfo createAutoConfigurationClass(String className) {
+        return ClassInfo.builder()
+            .fullyQualifiedName(className)
+            .classType(ClassType.CLASS)
+            .addAnnotation(AnnotationInfo.simple("org.springframework.boot.autoconfigure.AutoConfiguration"))
+            .build();
+    }
+}

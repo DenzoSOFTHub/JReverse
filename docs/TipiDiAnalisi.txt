@@ -1,0 +1,110 @@
+50 Tipologie di Analisi su un JAR Spring Boot
+🚪 1–10: Entrypoint e Flussi Principali (utilità massima)
+
+Mappa degli endpoint REST (path, metodo HTTP, parametri, ritorni).
+
+Call graph delle richieste HTTP (sequenza di chiamate controller → service → repository → DB).
+
+Individuazione del main method (SpringApplication.run(...)).
+
+Analisi del ciclo di bootstrap Spring Boot (component scan, bean creati all’avvio).
+
+Autowiring graph (chi inietta chi, tramite @Autowired, @Inject).
+
+Mappa dei controller REST e dei relativi metodi (@RestController, @RequestMapping).
+
+Report dei service layer (@Service) e dei metodi business.
+
+Mappa repository/database (@Repository, JpaRepository, query personalizzate).
+
+Eventi e listener Spring (@EventListener, ApplicationEvents).
+
+Sequenze di chiamata asincrone (@Async, scheduler, thread pool).
+
+🏗 11–20: Architettura e Dipendenze
+
+Mappa dei package e delle classi (albero gerarchico).
+
+Diagramma UML delle classi principali.
+
+Dipendenze tra package (accoppiamento, cicli).
+
+Dipendenze tra moduli/librerie (inclusi JAR di terze parti).
+
+Bean configuration report (@Configuration, @Bean).
+
+Proprietà di configurazione caricate (application.properties, application.yml).
+
+Profili Spring attivi (@Profile).
+
+Report delle annotazioni custom.
+
+Mapping delle eccezioni gestite (@ControllerAdvice, @ExceptionHandler).
+
+Analisi delle dependency injection circolari.
+
+🗃 21–30: Persistenza e Database
+
+Mappa delle entità JPA (@Entity).
+
+Relazioni tra entità (@OneToMany, @ManyToOne, ecc.).
+
+Schema DB ricostruito dalle entità (tabelle, chiavi primarie/esterne).
+
+Query native e JPQL usate.
+
+Analisi metodi custom nei repository Spring Data.
+
+Report su cache (@Cacheable, @CacheEvict).
+
+Uso delle transazioni (@Transactional).
+
+Analisi dei datasource configurati.
+
+Mappa delle migrazioni DB (Liquibase, Flyway).
+
+Ottimizzazione query (SQL estratte e analizzate).
+
+📊 31–40: Metriche, Performance, Qualità del Codice
+
+Metriche di complessità ciclomatica (metodi troppo complessi).
+
+Lunghezza media delle classi e dei metodi.
+
+Code smells (duplicazioni, metodi lunghi, variabili inutili).
+
+Analisi di coesione e accoppiamento.
+
+Coverage potenziale dei test (classi con logica critica ma senza test noti).
+
+Uso di log e livello logging.
+
+Punti critici di performance (metodi chiamati molto spesso).
+
+Identificazione di dead code (classi/metodi mai usati).
+
+Analisi della reflection (uso di Class.forName, proxies).
+
+Individuazione di thread creation diretta (invece di TaskExecutor).
+
+🔒 41–50: Sicurezza e Robustezza
+
+Mappa delle configurazioni Spring Security.
+
+Endpoint non protetti o pubblici.
+
+Uso di @PreAuthorize, @Secured e annotazioni di sicurezza.
+
+Analisi di dipendenze vulnerabili (CVE).
+
+Uso di crittografia e gestione password.
+
+Gestione input non validati.
+
+Gestione eccezioni runtime non catturate.
+
+Configurazioni pericolose (es. spring.jpa.show-sql=true in produzione).
+
+Analisi di esposizione di stack trace.
+
+Controllo delle librerie embedded (Tomcat/Jetty/Undertow) e loro versioni.

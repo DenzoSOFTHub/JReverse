@@ -1,0 +1,212 @@
+package it.denzosoft.jreverse.reporter.generator;
+
+import it.denzosoft.jreverse.core.exception.ReportGenerationException;
+import it.denzosoft.jreverse.core.model.JarContent;
+import it.denzosoft.jreverse.core.port.ReportFormat;
+import it.denzosoft.jreverse.core.port.ReportType;
+import it.denzosoft.jreverse.reporter.template.ReportContext;
+import it.denzosoft.jreverse.reporter.template.CssStyleManager;
+import it.denzosoft.jreverse.reporter.template.JavaScriptManager;
+
+import java.io.IOException;
+import java.io.OutputStreamWriter;
+import java.io.Writer;
+import java.nio.charset.StandardCharsets;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.util.Map;
+import java.util.logging.Logger;
+
+/**
+ * Abstract base class for HTML report generators.
+ * Provides common functionality for report generation with modular template system.
+ */
+public abstract class AbstractReportGenerator {
+    
+    protected static final Logger LOGGER = Logger.getLogger(AbstractReportGenerator.class.getName());
+    
+    protected final CssStyleManager styleManager;
+    protected final JavaScriptManager jsManager;
+    
+    protected AbstractReportGenerator() {
+        this.styleManager = new CssStyleManager();
+        this.jsManager = new JavaScriptManager();
+    }
+    
+    /**
+     * Generates the complete HTML report.
+     */
+    public void generate(JarContent jarContent, java.io.OutputStream output, 
+                        Map<String, Object> analysisResults) throws ReportGenerationException {
+        
+        try (Writer writer = new OutputStreamWriter(output, StandardCharsets.UTF_8)) {
+            ReportContext context = buildReportContext(jarContent, analysisResults);
+            
+            writeReportHeader(writer, context);
+            writeReportContent(writer, context);
+            writeReportFooter(writer, context);
+            
+            writer.flush();
+            
+        } catch (IOException e) {
+            throw new ReportGenerationException(
+                "Failed to generate HTML report", 
+                getReportType(), 
+                ReportFormat.HTML, 
+                ReportGenerationException.ErrorCode.OUTPUT_ERROR, 
+                e);
+        }
+    }
+    
+    /**
+     * Builds the report context with all necessary data.
+     */
+    protected ReportContext buildReportContext(JarContent jarContent, Map<String, Object> analysisResults) {
+        ReportContext context = new ReportContext();
+        context.setReportType(getReportType());
+        context.setJarContent(jarContent);
+        context.setAnalysisResults(analysisResults);
+        context.setGenerationTime(LocalDateTime.now());
+        context.setReportTitle(getReportTitle());
+        return context;
+    }
+    
+    /**
+     * Writes the HTML header including CSS and JavaScript.
+     */
+    protected void writeReportHeader(Writer writer, ReportContext context) throws IOException {
+        writer.write("<!DOCTYPE html>\n");
+        writer.write("<html lang=\"en\">\n");
+        writer.write("<head>\n");
+        writer.write("    <meta charset=\"UTF-8\">\n");
+        writer.write("    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n");
+        writer.write("    <title>JReverse - " + context.getReportTitle() + "</title>\n");
+        
+        // CSS Styles
+        writer.write("    <style>\n");
+        writer.write(styleManager.getCommonStyles());
+        writer.write(styleManager.getReportSpecificStyles(context.getReportType()));
+        writer.write("    </style>\n");
+        
+        writer.write("</head>\n");
+        writer.write("<body>\n");
+        
+        // Header section
+        writer.write("    <header class=\"main-header " + getHeaderCssClass() + "\">\n");
+        writer.write("        <h1>JReverse Analysis Report</h1>\n");
+        writer.write("        <div class=\"report-info\">\n");
+        writer.write("            <span class=\"report-type\">" + context.getReportTitle() + "</span>\n");
+        writer.write("            <span class=\"jar-name\">" + context.getJarContent().getLocation().getFileName() + "</span>\n");
+        writer.write("            <span class=\"generation-time\">" + 
+                    context.getGenerationTime().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")) + "</span>\n");
+        writer.write("        </div>\n");
+        writer.write("    </header>\n");
+        
+        writer.write("    <main class=\"content\">\n");
+    }
+    
+    /**
+     * Writes the main report content. Implemented by specific report generators.
+     */
+    protected abstract void writeReportContent(Writer writer, ReportContext context) throws IOException;
+    
+    /**
+     * Writes the HTML footer including JavaScript.
+     */
+    protected void writeReportFooter(Writer writer, ReportContext context) throws IOException {
+        writer.write("    </main>\n");
+        
+        writer.write("    <footer class=\"main-footer\">\n");
+        writer.write("        <p>Generated by JReverse v1.0.0 - Java Reverse Engineering Tool</p>\n");
+        writer.write("    </footer>\n");
+        
+        // JavaScript
+        writer.write("    <script>\n");
+        writer.write(jsManager.getCommonScripts());
+        writer.write(jsManager.getReportSpecificScripts(context.getReportType()));
+        writer.write("    </script>\n");
+        
+        writer.write("</body>\n");
+        writer.write("</html>\n");
+    }
+    
+    /**
+     * Utility method to escape HTML content.
+     */
+    protected String escapeHtml(String text) {
+        if (text == null) return "";
+        return text.replace("&", "&amp;")
+                  .replace("<", "&lt;")
+                  .replace(">", "&gt;")
+                  .replace("\"", "&quot;")
+                  .replace("'", "&#x27;");
+    }
+    
+    /**
+     * Utility method to write a stats grid section.
+     */
+    protected void writeStatsGrid(Writer writer, Map<String, Object> stats) throws IOException {
+        writer.write("        <div class=\"stats-grid\">\n");
+        
+        for (Map.Entry<String, Object> entry : stats.entrySet()) {
+            writer.write("            <div class=\"stat-card\">\n");
+            writer.write("                <h3>" + escapeHtml(entry.getKey()) + "</h3>\n");
+            
+            if (entry.getValue() instanceof Number) {
+                writer.write("                <span class=\"stat-number\">" + entry.getValue() + "</span>\n");
+            } else {
+                writer.write("                <span class=\"stat-text\">" + escapeHtml(entry.getValue().toString()) + "</span>\n");
+            }
+            
+            writer.write("            </div>\n");
+        }
+        
+        writer.write("        </div>\n");
+    }
+    
+    /**
+     * Utility method to check if analysis result is available.
+     */
+    protected boolean hasAnalysisResult(ReportContext context, String key) {
+        return context.getAnalysisResults() != null && 
+               context.getAnalysisResults().containsKey(key) &&
+               context.getAnalysisResults().get(key) != null;
+    }
+    
+    /**
+     * Utility method to get analysis result with type safety.
+     */
+    @SuppressWarnings("unchecked")
+    protected <T> T getAnalysisResult(ReportContext context, String key, Class<T> type) {
+        Object result = context.getAnalysisResults().get(key);
+        if (result != null && type.isInstance(result)) {
+            return (T) result;
+        }
+        return null;
+    }
+    
+    // Abstract methods to be implemented by concrete generators
+    
+    /**
+     * Returns the report type handled by this generator.
+     */
+    protected abstract ReportType getReportType();
+    
+    /**
+     * Returns the human-readable report title.
+     */
+    protected abstract String getReportTitle();
+    
+    /**
+     * Returns the CSS class for the header styling.
+     */
+    protected abstract String getHeaderCssClass();
+    
+    /**
+     * Returns whether this generator requires specific analysis results.
+     */
+    protected boolean requiresSchedulingAnalysis() { return false; }
+    protected boolean requiresAsyncAnalysis() { return false; }
+    protected boolean requiresMessagingAnalysis() { return false; }
+    protected boolean requiresSecurityAnalysis() { return false; }
+}

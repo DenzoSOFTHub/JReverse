@@ -1,0 +1,483 @@
+package it.denzosoft.jreverse.analyzer.repository;
+
+import it.denzosoft.jreverse.analyzer.beancreation.BeanCreationAnalyzer;
+import it.denzosoft.jreverse.analyzer.beancreation.BeanCreationResult;
+import it.denzosoft.jreverse.analyzer.beancreation.BeanInfo;
+import it.denzosoft.jreverse.core.model.*;
+import it.denzosoft.jreverse.core.port.RepositoryAnalyzer;
+
+import javassist.*;
+import javassist.bytecode.AnnotationsAttribute;
+import javassist.bytecode.ClassFile;
+import javassist.bytecode.annotation.Annotation;
+
+import java.util.*;
+import java.util.logging.Logger;
+import java.util.stream.Collectors;
+
+/**
+ * Javassist-based implementation for analyzing Spring Boot repository layer components.
+ * Delegates to BeanCreationAnalyzer and performs additional JPA-specific analysis.
+ */
+public class JavassistRepositoryAnalyzer implements RepositoryAnalyzer {
+    
+    private static final Logger LOGGER = Logger.getLogger(JavassistRepositoryAnalyzer.class.getName());
+    
+    private final BeanCreationAnalyzer beanCreationAnalyzer;
+    private final ClassPool classPool;
+    
+    public JavassistRepositoryAnalyzer(BeanCreationAnalyzer beanCreationAnalyzer) {
+        this.beanCreationAnalyzer = Objects.requireNonNull(beanCreationAnalyzer, 
+            "BeanCreationAnalyzer is required");
+        this.classPool = ClassPool.getDefault();
+    }
+    
+    @Override
+    public RepositoryAnalysisResult analyzeRepositories(JarContent jarContent) {
+        LOGGER.info("Starting repository analysis for JAR: " + jarContent.getLocation().getFileName());
+        
+        try {
+            // Add JAR to classpath
+            classPool.insertClassPath(jarContent.getLocation().toString());
+            
+            // Delegate to existing bean creation analyzer
+            BeanCreationResult beanResult = beanCreationAnalyzer.analyzeBeanCreation(jarContent);
+            
+            // Extract repository-specific information
+            List<RepositoryComponentInfo> repositoryComponents = transformRepositoryComponents(
+                beanResult.getRepositoryBeans(), jarContent);
+            RepositoryMetrics metrics = calculateRepositoryMetrics(repositoryComponents);
+            List<RepositoryIssue> issues = analyzeRepositoryIssues(repositoryComponents);
+            RepositorySummary summary = buildRepositorySummary(repositoryComponents, metrics, issues);
+            
+            LOGGER.info("Repository analysis completed. Found " + repositoryComponents.size() + 
+                       " repository components with " + issues.size() + " issues");
+            
+            return RepositoryAnalysisResult.builder()
+                .repositories(repositoryComponents)
+                .metrics(metrics)
+                .issues(issues)
+                .summary(summary)
+                .build();
+                
+        } catch (Exception e) {
+            LOGGER.severe("Error during repository analysis: " + e.getMessage());
+            throw new RuntimeException("Failed to analyze repository layer", e);
+        }
+    }
+    
+    @Override
+    public boolean canAnalyze(JarContent jarContent) {
+        return beanCreationAnalyzer.canAnalyze(jarContent);
+    }
+    
+    private List<RepositoryComponentInfo> transformRepositoryComponents(List<BeanInfo> repositoryBeans, 
+                                                                      JarContent jarContent) {
+        return repositoryBeans.stream()
+            .map(bean -> transformToRepositoryComponent(bean, jarContent))
+            .filter(Objects::nonNull)
+            .collect(Collectors.toList());
+    }
+    
+    private RepositoryComponentInfo transformToRepositoryComponent(BeanInfo beanInfo, JarContent jarContent) {
+        try {
+            String className = beanInfo.getDeclaringClassName();
+            CtClass ctClass = classPool.get(className);
+            
+            boolean isJpaRepository = isJpaRepository(ctClass);
+            String entityType = extractEntityType(ctClass);
+            List<String> queryMethods = extractQueryMethods(ctClass);
+            List<String> customQueries = extractCustomQueries(ctClass);
+            boolean hasTransactionalMethods = hasTransactionalMethods(ctClass);
+            
+            return RepositoryComponentInfo.builder()
+                .className(className)
+                .repositoryName(extractRepositoryName(beanInfo))
+                .repositoryType(determineRepositoryType(ctClass))
+                .entityType(entityType)
+                .isJpaRepository(isJpaRepository)
+                .queryMethods(queryMethods)
+                .customQueries(customQueries)
+                .isTransactional(hasTransactionalMethods)
+                .dependencies(beanInfo.getDependencies() != null ? 
+                            new ArrayList<>(beanInfo.getDependencies()) : new ArrayList<>())
+                .build();
+                
+        } catch (Exception e) {
+            LOGGER.warning("Error analyzing repository component " + beanInfo.getDeclaringClassName() + ": " + e.getMessage());
+            return null;
+        }
+    }
+    
+    private boolean isJpaRepository(CtClass ctClass) {
+        try {
+            // Check if it extends JpaRepository or CrudRepository
+            return extendsJpaInterface(ctClass, "JpaRepository") ||
+                   extendsJpaInterface(ctClass, "CrudRepository") ||
+                   extendsJpaInterface(ctClass, "PagingAndSortingRepository");
+        } catch (Exception e) {
+            return false;
+        }
+    }
+    
+    private boolean extendsJpaInterface(CtClass ctClass, String interfaceName) {
+        try {
+            CtClass[] interfaces = ctClass.getInterfaces();
+            for (CtClass iface : interfaces) {
+                if (iface.getName().contains(interfaceName)) {
+                    return true;
+                }
+                // Check parent interfaces recursively
+                if (extendsJpaInterface(iface, interfaceName)) {
+                    return true;
+                }
+            }
+            return false;
+        } catch (Exception e) {
+            return false;
+        }
+    }
+    
+    private String extractEntityType(CtClass ctClass) {
+        try {
+            // For JPA repositories, entity type is usually the first generic parameter
+            String signature = ctClass.getGenericSignature();
+            if (signature != null && signature.contains("<")) {
+                int start = signature.indexOf('<') + 1;
+                int end = signature.indexOf(';', start);
+                if (end > start) {
+                    String entityType = signature.substring(start, end).replace('/', '.');
+                    if (entityType.startsWith("L")) {
+                        entityType = entityType.substring(1);
+                    }
+                    return entityType;
+                }
+            }
+            
+            // Fallback: analyze method signatures
+            CtMethod[] methods = ctClass.getDeclaredMethods();
+            for (CtMethod method : methods) {
+                if (method.getName().startsWith("findBy") || method.getName().startsWith("save")) {
+                    String returnType = method.getReturnType().getName();
+                    if (!returnType.startsWith("java.") && !returnType.equals("void")) {
+                        return returnType;
+                    }
+                }
+            }
+        } catch (Exception e) {
+            LOGGER.fine("Could not extract entity type for " + ctClass.getName() + ": " + e.getMessage());
+        }
+        
+        return "Unknown";
+    }
+    
+    private List<String> extractQueryMethods(CtClass ctClass) {
+        List<String> queryMethods = new ArrayList<>();
+        
+        try {
+            CtMethod[] methods = ctClass.getDeclaredMethods();
+            for (CtMethod method : methods) {
+                String methodName = method.getName();
+                
+                // Standard JPA query method patterns
+                if (methodName.startsWith("findBy") ||
+                    methodName.startsWith("countBy") ||
+                    methodName.startsWith("deleteBy") ||
+                    methodName.startsWith("existsBy") ||
+                    methodName.startsWith("readBy") ||
+                    methodName.startsWith("queryBy") ||
+                    methodName.startsWith("getBy")) {
+                    
+                    queryMethods.add(methodName + method.getSignature());
+                }
+            }
+        } catch (Exception e) {
+            LOGGER.fine("Error extracting query methods from " + ctClass.getName() + ": " + e.getMessage());
+        }
+        
+        return queryMethods;
+    }
+    
+    private List<String> extractCustomQueries(CtClass ctClass) {
+        List<String> customQueries = new ArrayList<>();
+        
+        try {
+            CtMethod[] methods = ctClass.getDeclaredMethods();
+            for (CtMethod method : methods) {
+                // Check for @Query annotations
+                AnnotationsAttribute attr = (AnnotationsAttribute) method.getMethodInfo()
+                    .getAttribute(AnnotationsAttribute.visibleTag);
+                
+                if (attr != null) {
+                    Annotation[] annotations = attr.getAnnotations();
+                    for (Annotation annotation : annotations) {
+                        if (annotation.getTypeName().contains("Query")) {
+                            String query = extractQueryValue(annotation);
+                            if (query != null && !query.isEmpty()) {
+                                customQueries.add(method.getName() + ": " + query);
+                            }
+                        }
+                    }
+                }
+            }
+        } catch (Exception e) {
+            LOGGER.fine("Error extracting custom queries from " + ctClass.getName() + ": " + e.getMessage());
+        }
+        
+        return customQueries;
+    }
+    
+    private String extractQueryValue(Annotation annotation) {
+        try {
+            // Simplified query extraction - would need more sophisticated parsing in real implementation
+            String annotationString = annotation.toString();
+            if (annotationString.contains("value=")) {
+                int start = annotationString.indexOf("value=") + 6;
+                int end = annotationString.indexOf(',', start);
+                if (end == -1) end = annotationString.indexOf(')', start);
+                if (end > start) {
+                    return annotationString.substring(start, end).trim().replace("\"", "");
+                }
+            }
+        } catch (Exception e) {
+            // Ignore parsing errors
+        }
+        return null;
+    }
+    
+    private boolean hasTransactionalMethods(CtClass ctClass) {
+        try {
+            CtMethod[] methods = ctClass.getDeclaredMethods();
+            for (CtMethod method : methods) {
+                AnnotationsAttribute attr = (AnnotationsAttribute) method.getMethodInfo()
+                    .getAttribute(AnnotationsAttribute.visibleTag);
+                
+                if (attr != null) {
+                    Annotation[] annotations = attr.getAnnotations();
+                    for (Annotation annotation : annotations) {
+                        if (annotation.getTypeName().contains("Transactional")) {
+                            return true;
+                        }
+                    }
+                }
+            }
+            
+            // Check class-level @Transactional
+            ClassFile classFile = ctClass.getClassFile();
+            AnnotationsAttribute classAttr = (AnnotationsAttribute) classFile
+                .getAttribute(AnnotationsAttribute.visibleTag);
+            
+            if (classAttr != null) {
+                Annotation[] annotations = classAttr.getAnnotations();
+                for (Annotation annotation : annotations) {
+                    if (annotation.getTypeName().contains("Transactional")) {
+                        return true;
+                    }
+                }
+            }
+        } catch (Exception e) {
+            LOGGER.fine("Error checking transactional methods in " + ctClass.getName() + ": " + e.getMessage());
+        }
+        
+        return false;
+    }
+    
+    private String extractRepositoryName(BeanInfo beanInfo) {
+        String beanName = beanInfo.getBeanName();
+        if (beanName != null && !beanName.isEmpty()) {
+            return beanName;
+        }
+        
+        String className = beanInfo.getDeclaringClassName();
+        if (className != null) {
+            int lastDot = className.lastIndexOf('.');
+            String simpleName = lastDot >= 0 ? className.substring(lastDot + 1) : className;
+            
+            if (simpleName.endsWith("Repository")) {
+                simpleName = simpleName.substring(0, simpleName.length() - 10);
+            }
+            return Character.toLowerCase(simpleName.charAt(0)) + simpleName.substring(1) + "Repository";
+        }
+        
+        return "unknownRepository";
+    }
+    
+    private String determineRepositoryType(CtClass ctClass) {
+        if (isJpaRepository(ctClass)) {
+            return "JPA Repository";
+        } else if (hasRepositoryAnnotation(ctClass)) {
+            return "Custom Repository";
+        } else {
+            return "Component Repository";
+        }
+    }
+    
+    private boolean hasRepositoryAnnotation(CtClass ctClass) {
+        try {
+            ClassFile classFile = ctClass.getClassFile();
+            AnnotationsAttribute attr = (AnnotationsAttribute) classFile
+                .getAttribute(AnnotationsAttribute.visibleTag);
+            
+            if (attr != null) {
+                Annotation[] annotations = attr.getAnnotations();
+                for (Annotation annotation : annotations) {
+                    if (annotation.getTypeName().contains("Repository")) {
+                        return true;
+                    }
+                }
+            }
+        } catch (Exception e) {
+            // Ignore
+        }
+        return false;
+    }
+    
+    private RepositoryMetrics calculateRepositoryMetrics(List<RepositoryComponentInfo> repositories) {
+        int totalRepositories = repositories.size();
+        int jpaRepositories = (int) repositories.stream()
+            .filter(RepositoryComponentInfo::isJpaRepository)
+            .count();
+        int customRepositories = totalRepositories - jpaRepositories;
+        
+        int totalQueryMethods = repositories.stream()
+            .mapToInt(repo -> repo.getCustomMethods().size())
+            .sum();
+        
+        int nativeQueries = (int) repositories.stream()
+            .flatMap(repo -> repo.getCustomQueries().stream())
+            .filter(query -> query.toUpperCase().contains("NATIVE"))
+            .count();
+        
+        int customQueries = repositories.stream()
+            .mapToInt(repo -> repo.getCustomQueries().size())
+            .sum();
+        
+        double averageMethodsPerRepository = totalRepositories > 0 ? 
+            (double) totalQueryMethods / totalRepositories : 0.0;
+        
+        return RepositoryMetrics.builder()
+            .totalRepositories(totalRepositories)
+            .jpaRepositories(jpaRepositories)
+            .customRepositories(customRepositories)
+            .totalQueryMethods(totalQueryMethods)
+            .nativeQueries(nativeQueries)
+            .customQueries(customQueries)
+            .averageMethodsPerRepository(averageMethodsPerRepository)
+            .build();
+    }
+    
+    private List<RepositoryIssue> analyzeRepositoryIssues(List<RepositoryComponentInfo> repositories) {
+        List<RepositoryIssue> issues = new ArrayList<>();
+        
+        for (RepositoryComponentInfo repo : repositories) {
+            // Check for too many query methods
+            if (repo.getCustomMethods().size() > 20) {
+                issues.add(RepositoryIssue.builder()
+                    .type(RepositoryIssue.IssueType.TOO_MANY_QUERY_METHODS)
+                    .severity(RepositoryIssue.Severity.WARNING)
+                    .repositoryName(repo.getRepositoryName())
+                    .description("Repository has " + repo.getCustomMethods().size() + " query methods")
+                    .recommendation("Consider breaking down the repository or using specifications")
+                    .build());
+            }
+            
+            // Check for missing @Transactional on custom repositories
+            if (!repo.isJpaRepository() && !repo.isTransactional()) {
+                issues.add(RepositoryIssue.builder()
+                    .type(RepositoryIssue.IssueType.MISSING_TRANSACTIONAL)
+                    .severity(RepositoryIssue.Severity.INFO)
+                    .repositoryName(repo.getRepositoryName())
+                    .description("Custom repository lacks @Transactional annotations")
+                    .recommendation("Consider adding @Transactional for proper transaction management")
+                    .build());
+            }
+            
+            // Check for excessive native queries
+            long nativeQueryCount = repo.getCustomQueries().stream()
+                .filter(query -> query.toUpperCase().contains("NATIVE"))
+                .count();
+            
+            if (nativeQueryCount > 5) {
+                issues.add(RepositoryIssue.builder()
+                    .type(RepositoryIssue.IssueType.NATIVE_QUERY_OVERUSE)
+                    .severity(RepositoryIssue.Severity.WARNING)
+                    .repositoryName(repo.getRepositoryName())
+                    .description("Repository has " + nativeQueryCount + " native queries")
+                    .recommendation("Consider using JPA criteria queries or derived query methods")
+                    .build());
+            }
+            
+            // Check for repositories with no custom methods
+            if (repo.isJpaRepository() && repo.getCustomMethods().isEmpty()) {
+                issues.add(RepositoryIssue.builder()
+                    .type(RepositoryIssue.IssueType.NO_CUSTOM_METHODS)
+                    .severity(RepositoryIssue.Severity.INFO)
+                    .repositoryName(repo.getRepositoryName())
+                    .description("JPA repository has no custom query methods")
+                    .recommendation("Consider if basic CRUD operations are sufficient or add custom methods")
+                    .build());
+            }
+        }
+        
+        return issues;
+    }
+    
+    private RepositorySummary buildRepositorySummary(List<RepositoryComponentInfo> repositories, 
+                                                   RepositoryMetrics metrics, 
+                                                   List<RepositoryIssue> issues) {
+        
+        String qualityRating = calculateQualityRating(repositories, issues);
+        boolean hasGoodDataAccess = evaluateDataAccessPattern(repositories, issues);
+        
+        return RepositorySummary.builder()
+            .totalRepositories(repositories.size())
+            .jpaRepositories(metrics.getJpaRepositories())
+            .customRepositories(metrics.getCustomRepositories())
+            .totalIssues(issues.size())
+            .qualityRating(qualityRating)
+            .hasGoodDataAccess(hasGoodDataAccess)
+            .build();
+    }
+    
+    private String calculateQualityRating(List<RepositoryComponentInfo> repositories, List<RepositoryIssue> issues) {
+        if (repositories.isEmpty()) {
+            return "N/A - No Repositories";
+        }
+        
+        double issueRatio = (double) issues.size() / repositories.size();
+        long errorCount = issues.stream().filter(i -> i.getSeverity() == RepositoryIssue.Severity.ERROR).count();
+        
+        if (errorCount > 0) {
+            return "Poor - Has Critical Issues";
+        } else if (issueRatio <= 0.1) {
+            return "Excellent";
+        } else if (issueRatio <= 0.3) {
+            return "Good";
+        } else if (issueRatio <= 0.5) {
+            return "Fair";
+        } else {
+            return "Poor";
+        }
+    }
+    
+    private boolean evaluateDataAccessPattern(List<RepositoryComponentInfo> repositories, List<RepositoryIssue> issues) {
+        if (repositories.isEmpty()) {
+            return false;
+        }
+        
+        // Good data access criteria:
+        // - Most repositories are JPA repositories
+        // - No excessive native queries
+        // - Reasonable number of query methods per repository
+        
+        double jpaRatio = (double) repositories.stream().mapToInt(r -> r.isJpaRepository() ? 1 : 0).sum() / repositories.size();
+        boolean hasExcessiveNativeQueries = issues.stream()
+            .anyMatch(i -> i.getType() == RepositoryIssue.IssueType.NATIVE_QUERY_OVERUSE);
+        double avgQueryMethods = repositories.stream()
+            .mapToDouble(r -> r.getCustomMethods().size())
+            .average()
+            .orElse(0.0);
+        
+        return jpaRatio >= 0.7 && !hasExcessiveNativeQueries && avgQueryMethods <= 15.0;
+    }
+}
