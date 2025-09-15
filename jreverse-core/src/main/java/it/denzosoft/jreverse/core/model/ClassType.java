@@ -7,6 +7,7 @@ public enum ClassType {
     CLASS("class"),
     PUBLIC_CLASS("public class"),
     ABSTRACT_CLASS("abstract class"),
+    PUBLIC_ABSTRACT_CLASS("public abstract class"),
     FINAL_CLASS("final class"),
     INTERFACE("interface"),
     PUBLIC_INTERFACE("public interface"),
@@ -27,6 +28,7 @@ public enum ClassType {
     
     public boolean isPublic() {
         return this == PUBLIC_CLASS || 
+               this == PUBLIC_ABSTRACT_CLASS ||
                this == PUBLIC_INTERFACE ||
                this == PUBLIC_ENUM ||
                this == PUBLIC_ANNOTATION;
@@ -46,6 +48,7 @@ public enum ClassType {
     
     public boolean isClass() {
         return this == CLASS || this == PUBLIC_CLASS || 
-               this == ABSTRACT_CLASS || this == FINAL_CLASS;
+               this == ABSTRACT_CLASS || this == PUBLIC_ABSTRACT_CLASS ||
+               this == FINAL_CLASS;
     }
 }

@@ -96,6 +96,11 @@ public final class ClassInfo {
                classType == ClassType.PUBLIC_ANNOTATION;
     }
     
+    public boolean isAbstract() {
+        return classType == ClassType.ABSTRACT_CLASS || 
+               classType == ClassType.PUBLIC_ABSTRACT_CLASS;
+    }
+    
     private String extractPackageName(String fullyQualifiedName) {
         int lastDotIndex = fullyQualifiedName.lastIndexOf('.');
         return lastDotIndex > 0 ? fullyQualifiedName.substring(0, lastDotIndex) : "";

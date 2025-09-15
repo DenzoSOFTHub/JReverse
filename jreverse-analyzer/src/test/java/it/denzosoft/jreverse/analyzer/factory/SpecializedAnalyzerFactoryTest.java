@@ -36,10 +36,12 @@ class SpecializedAnalyzerFactoryTest {
     }
     
     @Test
-    void testCreateComponentScanAnalyzer_ThrowsUnsupportedOperationException() {
-        assertThrows(UnsupportedOperationException.class, () -> {
-            SpecializedAnalyzerFactory.createComponentScanAnalyzer();
-        });
+    void testCreateComponentScanAnalyzer_ReturnsValidInstance() {
+        ComponentScanAnalyzer analyzer = SpecializedAnalyzerFactory.createComponentScanAnalyzer();
+        
+        assertNotNull(analyzer);
+        assertEquals("it.denzosoft.jreverse.analyzer.componentscan.JavassistComponentScanAnalyzer", 
+                     analyzer.getClass().getName());
     }
     
     @Test
@@ -66,11 +68,12 @@ class SpecializedAnalyzerFactoryTest {
     }
     
     @Test
-    void testCreateBootstrapAnalyzer_ThrowsUnsupportedOperationException() {
-        // BootstrapAnalyzer depends on ComponentScanAnalyzer which is not implemented
-        assertThrows(UnsupportedOperationException.class, () -> {
-            SpecializedAnalyzerFactory.createBootstrapAnalyzer();
-        });
+    void testCreateBootstrapAnalyzer_ReturnsValidInstance() {
+        BootstrapAnalyzer analyzer = SpecializedAnalyzerFactory.createBootstrapAnalyzer();
+        
+        assertNotNull(analyzer);
+        assertEquals("it.denzosoft.jreverse.analyzer.bootstrap.JavassistBootstrapAnalyzer",
+                     analyzer.getClass().getName());
     }
     
     @Test
