@@ -14,17 +14,25 @@ public class PropertyAnalysisResult {
     private final List<PropertySourceInfo> propertySources;
     private final Map<String, List<String>> propertyReferences;
     private final AnalysisMetadata metadata;
+
+    // Advanced analysis fields
+    private final Map<String, PropertyFileContent> propertyFiles;
+    private final PropertyHierarchyAnalysis hierarchyAnalysis;
+    private final PropertySecurityAnalysis securityAnalysis;
+    private final PropertyUsageAnalysis usageAnalysis;
     
-    private PropertyAnalysisResult(List<PropertyUsageInfo> valueInjections,
-                                 List<ConfigurationPropertiesInfo> configurationProperties,
-                                 List<PropertySourceInfo> propertySources,
-                                 Map<String, List<String>> propertyReferences,
-                                 AnalysisMetadata metadata) {
-        this.valueInjections = Collections.unmodifiableList(valueInjections);
-        this.configurationProperties = Collections.unmodifiableList(configurationProperties);
-        this.propertySources = Collections.unmodifiableList(propertySources);
-        this.propertyReferences = Collections.unmodifiableMap(propertyReferences);
-        this.metadata = metadata;
+    private PropertyAnalysisResult(Builder builder) {
+        this.valueInjections = Collections.unmodifiableList(builder.valueInjections);
+        this.configurationProperties = Collections.unmodifiableList(builder.configurationProperties);
+        this.propertySources = Collections.unmodifiableList(builder.propertySources);
+        this.propertyReferences = Collections.unmodifiableMap(builder.propertyReferences);
+        this.metadata = builder.metadata;
+
+        // Advanced analysis fields
+        this.propertyFiles = Collections.unmodifiableMap(builder.propertyFiles);
+        this.hierarchyAnalysis = builder.hierarchyAnalysis;
+        this.securityAnalysis = builder.securityAnalysis;
+        this.usageAnalysis = builder.usageAnalysis;
     }
     
     public static Builder builder() {
@@ -49,6 +57,37 @@ public class PropertyAnalysisResult {
     
     public AnalysisMetadata getMetadata() {
         return metadata;
+    }
+
+    // Advanced analysis getters
+    public Map<String, PropertyFileContent> getPropertyFiles() {
+        return propertyFiles;
+    }
+
+    public PropertyHierarchyAnalysis getHierarchyAnalysis() {
+        return hierarchyAnalysis;
+    }
+
+    public PropertySecurityAnalysis getSecurityAnalysis() {
+        return securityAnalysis;
+    }
+
+    public PropertyUsageAnalysis getUsageAnalysis() {
+        return usageAnalysis;
+    }
+
+    /**
+     * Checks if advanced analysis was performed.
+     */
+    public boolean hasAdvancedAnalysis() {
+        return propertyFiles != null && !propertyFiles.isEmpty();
+    }
+
+    /**
+     * Gets the total number of parsed property files.
+     */
+    public int getPropertyFileCount() {
+        return propertyFiles != null ? propertyFiles.size() : 0;
     }
     
     public int getValueInjectionCount() {
@@ -85,6 +124,12 @@ public class PropertyAnalysisResult {
         private List<PropertySourceInfo> propertySources = Collections.emptyList();
         private Map<String, List<String>> propertyReferences = Collections.emptyMap();
         private AnalysisMetadata metadata = AnalysisMetadata.successful();
+
+        // Advanced analysis fields
+        private Map<String, PropertyFileContent> propertyFiles = Collections.emptyMap();
+        private PropertyHierarchyAnalysis hierarchyAnalysis;
+        private PropertySecurityAnalysis securityAnalysis;
+        private PropertyUsageAnalysis usageAnalysis;
         
         public Builder valueInjections(List<PropertyUsageInfo> valueInjections) {
             this.valueInjections = valueInjections != null ? valueInjections : Collections.emptyList();
@@ -110,10 +155,30 @@ public class PropertyAnalysisResult {
             this.metadata = metadata != null ? metadata : AnalysisMetadata.successful();
             return this;
         }
-        
+
+        // Advanced analysis builder methods
+        public Builder propertyFiles(Map<String, PropertyFileContent> propertyFiles) {
+            this.propertyFiles = propertyFiles != null ? propertyFiles : Collections.emptyMap();
+            return this;
+        }
+
+        public Builder hierarchyAnalysis(PropertyHierarchyAnalysis hierarchyAnalysis) {
+            this.hierarchyAnalysis = hierarchyAnalysis;
+            return this;
+        }
+
+        public Builder securityAnalysis(PropertySecurityAnalysis securityAnalysis) {
+            this.securityAnalysis = securityAnalysis;
+            return this;
+        }
+
+        public Builder usageAnalysis(PropertyUsageAnalysis usageAnalysis) {
+            this.usageAnalysis = usageAnalysis;
+            return this;
+        }
+
         public PropertyAnalysisResult build() {
-            return new PropertyAnalysisResult(valueInjections, configurationProperties, 
-                                            propertySources, propertyReferences, metadata);
+            return new PropertyAnalysisResult(this);
         }
     }
 }

@@ -3,9 +3,14 @@ package it.denzosoft.jreverse.app;
 import it.denzosoft.jreverse.core.logging.JReverseLogger;
 import it.denzosoft.jreverse.core.logging.LogLevel;
 import it.denzosoft.jreverse.core.logging.LoggingConfiguration;
+import it.denzosoft.jreverse.core.model.*;
+import it.denzosoft.jreverse.core.port.JarAnalyzerPort;
+import it.denzosoft.jreverse.analyzer.impl.WorkingEnhancedAnalyzer;
 
 import javax.swing.SwingUtilities;
 import javax.swing.UIManager;
+import java.io.File;
+import java.nio.file.Paths;
 import java.util.Arrays;
 
 /**
@@ -38,9 +43,9 @@ public class JReverseApplication {
                 // Launch Swing UI
                 launchSwingUI(context);
             } else {
-                // Run in CLI mode (future implementation)
-                LOGGER.info("CLI mode not yet implemented - launching GUI");
-                launchSwingUI(context);
+                // Run in CLI mode
+                LOGGER.info("Running in CLI mode");
+                runCliMode(args, context);
             }
             
         } catch (Exception e) {
@@ -191,9 +196,126 @@ public class JReverseApplication {
         }
     }
     
+    private static void runCliMode(String[] args, ApplicationContext context) {
+        try {
+            // Look for JAR file argument
+            String jarPath = null;
+            for (String arg : args) {
+                if (!arg.startsWith("--") && arg.endsWith(".jar")) {
+                    jarPath = arg;
+                    break;
+                }
+            }
+
+            if (jarPath == null) {
+                System.out.println("=== JReverse CLI Mode ===");
+                System.out.println("Usage: java -jar jreverse-app.jar --cli <jar-file>");
+                System.out.println("Example: java -jar jreverse-app.jar --cli myapp.jar");
+                System.exit(1);
+            }
+
+            File jarFile = new File(jarPath);
+            if (!jarFile.exists()) {
+                LOGGER.error("JAR file not found: " + jarPath);
+                System.exit(1);
+            }
+
+            LOGGER.info("Analyzing JAR file: " + jarPath);
+
+            // Create JAR location
+            JarLocation jarLocation = new JarLocation(jarPath);
+
+            // Initialize enhanced analyzer with Phase 3 capabilities
+            JarAnalyzerPort analyzer = new WorkingEnhancedAnalyzer();
+
+            // Perform analysis
+            JarContent jarContent = analyzer.analyzeJar(jarLocation);
+
+            // Generate CLI report
+            generateCliReport(jarContent);
+
+        } catch (Exception e) {
+            LOGGER.error("CLI analysis failed", e);
+            System.err.println("Analysis failed: " + e.getMessage());
+            System.exit(1);
+        }
+    }
+
+    private static void generateCliReport(JarContent jarContent) {
+        System.out.println("\n" + "=".repeat(80));
+        System.out.println("                    JREVERSE ANALYSIS REPORT");
+        System.out.println("=".repeat(80));
+
+        // Basic Information
+        System.out.println("\n📁 JAR INFORMATION:");
+        System.out.println("   Path: " + jarContent.getLocation().getPath());
+        System.out.println("   File Name: " + jarContent.getLocation().getFileName());
+        System.out.println("   JAR Type: " + jarContent.getJarType());
+        System.out.println("   Total Classes: " + jarContent.getClasses().size());
+
+        // Manifest Information
+        if (jarContent.getManifest() != null) {
+            JarManifestInfo manifest = jarContent.getManifest();
+            System.out.println("\n📋 MANIFEST INFORMATION:");
+            if (manifest.getMainClass() != null) {
+                System.out.println("   Main-Class: " + manifest.getMainClass());
+            }
+            if (manifest.getImplementationTitle() != null) {
+                System.out.println("   Implementation-Title: " + manifest.getImplementationTitle());
+            }
+            if (manifest.getImplementationVersion() != null) {
+                System.out.println("   Implementation-Version: " + manifest.getImplementationVersion());
+            }
+        }
+
+        // Class Analysis
+        System.out.println("\n🔍 CLASS ANALYSIS:");
+        java.util.Map<ClassType, Long> classCounts = jarContent.getClasses().stream()
+            .collect(java.util.stream.Collectors.groupingBy(
+                ClassInfo::getClassType,
+                java.util.stream.Collectors.counting()
+            ));
+
+        classCounts.forEach((type, count) -> {
+            System.out.println("   " + type + ": " + count);
+        });
+
+        // Top Packages
+        System.out.println("\n📦 TOP PACKAGES:");
+        java.util.Map<String, Long> packageCounts = jarContent.getClasses().stream()
+            .map(c -> {
+                String pkg = c.getFullyQualifiedName();
+                int lastDot = pkg.lastIndexOf('.');
+                return lastDot > 0 ? pkg.substring(0, lastDot) : "<default>";
+            })
+            .collect(java.util.stream.Collectors.groupingBy(
+                java.util.function.Function.identity(),
+                java.util.stream.Collectors.counting()
+            ));
+
+        packageCounts.entrySet().stream()
+            .sorted(java.util.Map.Entry.<String, Long>comparingByValue().reversed())
+            .limit(10)
+            .forEach(entry ->
+                System.out.println("   " + entry.getKey() + ": " + entry.getValue() + " classes")
+            );
+
+        // Performance Metrics
+        Runtime runtime = Runtime.getRuntime();
+        System.out.println("\n⚡ PERFORMANCE METRICS:");
+        System.out.println("   Max Memory: " + (runtime.maxMemory() / 1024 / 1024) + " MB");
+        System.out.println("   Used Memory: " + ((runtime.totalMemory() - runtime.freeMemory()) / 1024 / 1024) + " MB");
+        double usagePercentage = ((double)(runtime.totalMemory() - runtime.freeMemory()) / runtime.maxMemory()) * 100;
+        System.out.println("   Memory Usage: " + String.format("%.1f%%", usagePercentage));
+
+        System.out.println("\n" + "=".repeat(80));
+        System.out.println("Analysis completed successfully with JReverse v" + getVersion());
+        System.out.println("=".repeat(80));
+    }
+
     private static String getVersion() {
         Package pkg = JReverseApplication.class.getPackage();
         String version = pkg.getImplementationVersion();
-        return version != null ? version : "1.0.0-SNAPSHOT";
+        return version != null ? version : "1.1.0-OPTIMIZED";
     }
 }

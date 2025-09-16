@@ -1,0 +1,54 @@
+[2025-09-15 19:44:20] [INFO] LoggingConfiguration: Logging configured - Level: INFO, File logging: false
+[2025-09-15 19:44:20] [INFO] JReverseApplication: Starting JReverse Application v1.1.0
+[2025-09-15 19:44:20] [INFO] JReverseApplication: Arguments: [--cli, contrp.be-springboot-22.2.57.jar]
+[2025-09-15 19:44:20] [INFO] JReverseApplication: Java version validation passed: 21.0.7
+[2025-09-15 19:44:20] [INFO] ApplicationContext: Initializing simplified application context
+[2025-09-15 19:44:20] [INFO] ClassPoolManager: Initializing shared ClassPool for performance optimization
+[2025-09-15 19:44:20] [INFO] ClassPoolManager: ClassPoolManager initialized successfully
+[2025-09-15 19:44:20] [INFO] DefaultJarAnalyzer: DefaultJarAnalyzer initialized with optimized ClassPoolManager
+[2025-09-15 19:44:20] [INFO] ApplicationContext: Application context initialized successfully
+[2025-09-15 19:44:20] [INFO] JReverseApplication: Running in CLI mode
+[2025-09-15 19:44:20] [INFO] JReverseApplication: Analyzing JAR file: contrp.be-springboot-22.2.57.jar
+[2025-09-15 19:44:20] [INFO] DefaultJarAnalyzer: DefaultJarAnalyzer initialized with optimized ClassPoolManager
+[2025-09-15 19:44:20] [INFO] DefaultJarAnalyzer: Starting optimized analysis of JAR: /workspace/JReverse/contrp.be-springboot-22.2.57.jar
+[2025-09-15 19:44:21] [INFO] DefaultJarAnalyzer: Analysis completed. Found 1373 classes in contrp.be-springboot-22.2.57.jar (took 1097ms). ClassPoolManager[cacheSize=0, hitRate=0.00%, totalRequests=0]
+
+================================================================================
+                    JREVERSE ANALYSIS REPORT
+================================================================================
+
+📁 JAR INFORMATION:
+   Path: /workspace/JReverse/contrp.be-springboot-22.2.57.jar
+   File Name: contrp.be-springboot-22.2.57.jar
+   JAR Type: SPRING_BOOT_JAR
+   Total Classes: 1373
+
+📋 MANIFEST INFORMATION:
+   Main-Class: org.springframework.boot.loader.JarLauncher
+   Implementation-Title: contrp.be-springboot
+   Implementation-Version: 22.2.57
+
+🔍 CLASS ANALYSIS:
+   CLASS: 1367
+   INTERFACE: 6
+
+📦 TOP PACKAGES:
+   BOOT-INF.classes.it.lispa.contrp.be.api.domain: 293 classes
+   BOOT-INF.classes.it.lispa.contrp.be.api.client.simog.wsdl: 139 classes
+   BOOT-INF.classes.it.lispa.contrp.be.api.repository: 121 classes
+   BOOT-INF.classes.it.lispa.contrp.be.api.dto: 112 classes
+   BOOT-INF.classes.it.lispa.contrp.be.api.client.simog.xsd: 85 classes
+   BOOT-INF.classes.it.lispa.contrp.be.api.client.gazetteer: 65 classes
+   BOOT-INF.classes.it.lispa.contrp.be.api.mapper: 58 classes
+   BOOT-INF.classes.it.lispa.contrp.be.api.domain.schede: 44 classes
+   BOOT-INF.classes.it.lispa.contrp.be.api.mapper.schede: 36 classes
+   BOOT-INF.classes.it.lispa.contrp.be.api.controller: 35 classes
+
+⚡ PERFORMANCE METRICS:
+   Max Memory: 7956 MB
+   Used Memory: 24 MB
+   Memory Usage: 0.3%
+
+================================================================================
+Analysis completed successfully with JReverse v1.1.0
+================================================================================

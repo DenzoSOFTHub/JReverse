@@ -253,6 +253,7 @@ class JavassistLayeredArchitectureAnalyzerTest {
             .location(new JarLocation("/test/upward.jar"))
             .classes(Set.of(
                 createMockUpwardDependentRepositoryClass(),
+                createMockControllerClass(), // Need to include the Controller that Repository depends on
                 createMockServiceClass()
             ))
             .build();

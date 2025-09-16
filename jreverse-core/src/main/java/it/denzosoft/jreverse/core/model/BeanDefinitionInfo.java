@@ -127,7 +127,7 @@ public class BeanDefinitionInfo {
                 ", primary=" + isPrimary +
                 '}';
     }
-    
+
     public enum BeanScope {
         SINGLETON("singleton"),
         PROTOTYPE("prototype"),
@@ -135,17 +135,17 @@ public class BeanDefinitionInfo {
         SESSION("session"),
         APPLICATION("application"),
         WEBSOCKET("websocket");
-        
+
         private final String value;
-        
+
         BeanScope(String value) {
             this.value = value;
         }
-        
+
         public String getValue() {
             return value;
         }
-        
+
         public static BeanScope fromString(String value) {
             if (value == null) {
                 return SINGLETON;
@@ -158,7 +158,7 @@ public class BeanDefinitionInfo {
             return SINGLETON;
         }
     }
-    
+
     public static class Builder {
         private String beanName;
         private String beanClass;

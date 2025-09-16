@@ -2,6 +2,7 @@ package it.denzosoft.jreverse.reporter.html;
 
 import it.denzosoft.jreverse.core.logging.JReverseLogger;
 import it.denzosoft.jreverse.core.model.BeanDefinitionInfo;
+import it.denzosoft.jreverse.core.model.ComponentScanConfiguration;
 import it.denzosoft.jreverse.core.model.RestEndpointInfo;
 import it.denzosoft.jreverse.core.model.WebMvcMappingInfo;
 import it.denzosoft.jreverse.reporter.springboot.SpringBootEntrypointReport;
@@ -162,7 +163,7 @@ public class EntrypointReportHtmlWriter {
         
         if (report.getMainMethodAnalysis() != null && report.getMainMethodAnalysis().isSuccessful()) {
             writer.write("            <p><strong>Main Method Type:</strong> ");
-            writer.write("<span class=\"badge badge-primary\">" + report.getMainMethodAnalysis().getMainMethodType() + "</span></p>\n");
+            writer.write("<span class=\"badge badge-primary\">" + report.getMainMethodAnalysis().getType() + "</span></p>\n");
             
             if (report.getMainMethodAnalysis().getDeclaringClassName() != null) {
                 writer.write("            <p><strong>Declaring Class:</strong> <span class=\"code\">" + 
@@ -182,8 +183,8 @@ public class EntrypointReportHtmlWriter {
         if (report.getComponentScanAnalysis() != null && report.getComponentScanAnalysis().hasConfigurations()) {
             writer.write("            <h3>Configuration Classes</h3>\n");
             writer.write("            <ul>\n");
-            for (String config : report.getComponentScanAnalysis().getConfigurationClasses()) {
-                writer.write("                <li><span class=\"code\">" + escapeHtml(config) + "</span></li>\n");
+            for (ComponentScanConfiguration config : report.getComponentScanAnalysis().getConfigurations()) {
+                writer.write("                <li><span class=\"code\">" + escapeHtml(config.getSourceClass()) + "</span></li>\n");
             }
             writer.write("            </ul>\n");
             

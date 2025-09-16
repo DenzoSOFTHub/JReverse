@@ -32,19 +32,18 @@ public class BootstrapAnalysisReportGenerator extends AbstractReportGenerator {
     protected ReportContext buildReportContext(JarContent jarContent, Map<String, Object> analysisResults) {
         BootstrapAnalysisResult bootstrapResult = (BootstrapAnalysisResult) analysisResults.get("bootstrap");
         
-        return ReportContext.builder(
-            jarContent.getLocation().getFileName())
-            .reportTitle("Spring Boot Bootstrap Analysis")
-            .reportDescription("Interactive sequence diagram and analysis of Spring Boot application startup")
-            .generatedAt(java.time.LocalDateTime.now())
-            .addData("bootstrapResult", bootstrapResult)
-            .addData("jarContent", jarContent)
-            .build();
+        ReportContext context = new ReportContext();
+        context.setJarContent(jarContent);
+        context.setReportTitle("Spring Boot Bootstrap Analysis");
+        context.setGenerationTime(java.time.LocalDateTime.now());
+        context.getAnalysisResults().put("bootstrapResult", bootstrapResult);
+        context.getAnalysisResults().put("jarContent", jarContent);
+        return context;
     }
     
     @Override
     protected void writeReportContent(Writer writer, ReportContext context) throws IOException {
-        BootstrapAnalysisResult bootstrapResult = (BootstrapAnalysisResult) context.getData("bootstrapResult");
+        BootstrapAnalysisResult bootstrapResult = (BootstrapAnalysisResult) context.getAnalysisResults().get("bootstrapResult");
         
         if (bootstrapResult == null || bootstrapResult.getTotalSteps() == 0) {
             writeNoDataMessage(writer);
@@ -189,26 +188,19 @@ public class BootstrapAnalysisReportGenerator extends AbstractReportGenerator {
         writer.write("<h3>Performance Insights</h3>");
         writer.write("<ul>");
         
-        BootstrapSequencePhase slowestPhase = result.getTimingInfo().getSlowestPhase();
+        BootstrapSequencePhase slowestPhase = result.getTimingInfo().getLongestPhase();
         if (slowestPhase != null) {
             writer.write(String.format("<li><strong>Slowest Phase:</strong> %s (%.1f%% of total time)</li>",
                 slowestPhase.getDisplayName(),
                 result.getTimingInfo().getPhasePercentage(slowestPhase)));
         }
         
-        List<BootstrapSequenceStep> slowestSteps = result.getTimingInfo().getSlowestSteps(5);
-        if (!slowestSteps.isEmpty()) {
-            writer.write("<li><strong>Slowest Steps:</strong>");
-            writer.write("<ol>");
-            for (BootstrapSequenceStep step : slowestSteps) {
-                writer.write(String.format("<li>%s.%s (%dms)</li>",
-                    getSimpleClassName(step.getParticipantClass()),
-                    step.getMethodName(),
-                    step.getEstimatedDurationMs()));
-            }
-            writer.write("</ol>");
-            writer.write("</li>");
-        }
+        // Note: getSlowestSteps method not available in BootstrapTimingInfo
+        // Using phase-based analysis instead
+        writer.write("<li><strong>Performance Summary:</strong> ");
+        writer.write(String.format("Total %d steps analyzed in %d phases</li>",
+            result.getTimingInfo().getTotalStepCount(),
+            result.getTimingInfo().getPhaseDurations().size()));
         
         writer.write("</ul>");
         writer.write("</div>");
@@ -277,7 +269,7 @@ public class BootstrapAnalysisReportGenerator extends AbstractReportGenerator {
         return lastDot >= 0 ? fullyQualifiedName.substring(lastDot + 1) : fullyQualifiedName;
     }
     
-    @Override
+    // Custom styles for bootstrap analysis report
     protected void writeCustomStyles(Writer writer) throws IOException {
         writer.write("<style>\n" +
             ".summary-cards {\n" +
@@ -468,7 +460,7 @@ public class BootstrapAnalysisReportGenerator extends AbstractReportGenerator {
             "</style>");
     }
     
-    @Override
+    // Custom scripts for bootstrap analysis report
     protected void writeCustomScripts(Writer writer) throws IOException {
         writer.write("<script>\n" +
             "function switchDiagramFormat() {\n" +

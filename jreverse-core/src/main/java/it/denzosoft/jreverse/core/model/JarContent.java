@@ -19,6 +19,7 @@ public final class JarContent {
     private final JarManifestInfo manifest;
     private final long analysisTimestamp;
     private final JarType jarType;
+    private final Object comprehensiveAnalysis; // Using Object to avoid circular dependencies
     
     private JarContent(Builder builder) {
         this.location = Objects.requireNonNull(builder.location, "location cannot be null");
@@ -27,6 +28,7 @@ public final class JarContent {
         this.manifest = builder.manifest;
         this.analysisTimestamp = builder.analysisTimestamp > 0 ? builder.analysisTimestamp : System.currentTimeMillis();
         this.jarType = Objects.requireNonNull(builder.jarType, "jarType cannot be null");
+        this.comprehensiveAnalysis = builder.comprehensiveAnalysis;
     }
     
     public JarLocation getLocation() {
@@ -51,6 +53,10 @@ public final class JarContent {
     
     public JarType getJarType() {
         return jarType;
+    }
+
+    public Object getComprehensiveAnalysis() {
+        return comprehensiveAnalysis;
     }
     
     public int getClassCount() {
@@ -186,6 +192,7 @@ public final class JarContent {
         private JarManifestInfo manifest;
         private long analysisTimestamp;
         private JarType jarType = JarType.REGULAR;
+        private Object comprehensiveAnalysis;
         
         public Builder location(JarLocation location) {
             this.location = location;
@@ -228,6 +235,11 @@ public final class JarContent {
         
         public Builder jarType(JarType jarType) {
             this.jarType = jarType;
+            return this;
+        }
+
+        public Builder comprehensiveAnalysis(Object comprehensiveAnalysis) {
+            this.comprehensiveAnalysis = comprehensiveAnalysis;
             return this;
         }
         

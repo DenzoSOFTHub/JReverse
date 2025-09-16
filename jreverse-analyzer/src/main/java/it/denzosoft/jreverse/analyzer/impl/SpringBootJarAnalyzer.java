@@ -25,8 +25,9 @@ public class SpringBootJarAnalyzer extends DefaultJarAnalyzer {
     
     private final SpringBootDetector springBootDetector;
     
+    @Deprecated
     public SpringBootJarAnalyzer(ClassPool classPool, SpringBootDetector springBootDetector) {
-        super(classPool);
+        super(); // FIXED: Use default constructor
         this.springBootDetector = springBootDetector;
     }
     
@@ -61,9 +62,9 @@ public class SpringBootJarAnalyzer extends DefaultJarAnalyzer {
     private Set<ClassInfo> analyzeSpringBootClasses(JarFile jarFile, JarLocation jarLocation) throws JarAnalysisException {
         Set<ClassInfo> classes = new HashSet<>();
         
-        // Add JAR to ClassPool for Spring Boot analysis
+        // FIXED: Use protected accessor for ClassPool
         try {
-            classPool.appendClassPath(jarLocation.getPath().toString());
+            getSharedClassPool().appendClassPath(jarLocation.getPath().toString());
         } catch (Exception e) {
             LOGGER.warning("Could not add Spring Boot JAR to ClassPool: " + e.getMessage());
         }

@@ -32,7 +32,7 @@ public class ScheduledTasksAnalysisGenerator extends AbstractReportGenerator {
     }
     
     @Override
-    protected boolean requiresSchedulingAnalysis() {
+    public boolean requiresSchedulingAnalysis() {
         return true;
     }
     
@@ -72,18 +72,18 @@ public class ScheduledTasksAnalysisGenerator extends AbstractReportGenerator {
         
         SchedulingAnalysisResult schedulingResult = getAnalysisResult(context, "schedulingAnalysis", SchedulingAnalysisResult.class);
         if (schedulingResult != null) {
-            stats.put("Total Scheduled Tasks", schedulingResult.getTotalScheduledTasks());
-            stats.put("Cron Expressions", schedulingResult.getCronExpressionsCount());
-            stats.put("Fixed Rate Tasks", schedulingResult.getFixedRateTasksCount());
-            stats.put("Fixed Delay Tasks", schedulingResult.getFixedDelayTasksCount());
-            stats.put("Next Execution", schedulingResult.getNextExecutionTime());
+            stats.put("Total Scheduled Methods", schedulingResult.getScheduledMethodCount());
+            stats.put("Cron Expressions", schedulingResult.getCronExpressionCount());
+            stats.put("Fixed Rate Tasks", schedulingResult.getFixedRateCount());
+            stats.put("Fixed Delay Tasks", schedulingResult.getFixedDelayCount());
+            stats.put("Schedulers Found", schedulingResult.getSchedulerCount());
         } else {
             // Fallback data for demonstration
-            stats.put("Total Scheduled Tasks", 15);
+            stats.put("Total Scheduled Methods", 15);
             stats.put("Cron Expressions", 8);
             stats.put("Fixed Rate Tasks", 4);
             stats.put("Fixed Delay Tasks", 3);
-            stats.put("Next Execution", "In 5 minutes");
+            stats.put("Schedulers Found", 2);
         }
         
         return stats;

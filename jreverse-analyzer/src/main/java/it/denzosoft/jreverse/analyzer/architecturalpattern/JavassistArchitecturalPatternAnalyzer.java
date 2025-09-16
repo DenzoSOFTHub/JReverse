@@ -215,10 +215,10 @@ public class JavassistArchitecturalPatternAnalyzer implements ArchitecturalPatte
     private DetectedArchitecturalPattern detectRepositoryPattern(JarContent jarContent) {
         boolean hasRepositories = jarContent.getClasses().stream()
             .anyMatch(this::isRepository);
-        
+
         boolean hasEntities = jarContent.getClasses().stream()
             .anyMatch(this::isEntity);
-        
+
         if (hasRepositories && hasEntities) {
             return DetectedArchitecturalPattern.builder()
                 .name("Repository Pattern")
@@ -228,28 +228,55 @@ public class JavassistArchitecturalPatternAnalyzer implements ArchitecturalPatte
                 .involvedPackages(Set.of("Repository", "Entity"))
                 .build();
         }
-        
+
         return null;
+    }
+
+    private List<DetectedDesignPattern> detectRepositoryDesignPattern(JarContent jarContent) {
+        List<DetectedDesignPattern> repositoryPatterns = new ArrayList<>();
+
+        boolean hasRepositories = jarContent.getClasses().stream()
+            .anyMatch(this::isRepository);
+
+        boolean hasEntities = jarContent.getClasses().stream()
+            .anyMatch(this::isEntity);
+
+        if (hasRepositories && hasEntities) {
+            repositoryPatterns.add(DetectedDesignPattern.builder()
+                .patternType(DesignPatternType.REPOSITORY)
+                .confidenceScore(0.85)
+                .description("Repository pattern for data access abstraction")
+                .participatingClasses(jarContent.getClasses().stream()
+                    .filter(this::isRepository)
+                    .map(ClassInfo::getFullyQualifiedName)
+                    .collect(java.util.stream.Collectors.toSet()))
+                .build());
+        }
+
+        return repositoryPatterns;
     }
     
     private List<DetectedDesignPattern> detectDesignPatterns(JarContent jarContent) {
         List<DetectedDesignPattern> patterns = new ArrayList<>();
-        
+
         // Detect Singleton pattern
         patterns.addAll(detectSingletonPattern(jarContent));
-        
+
         // Detect Factory pattern
         patterns.addAll(detectFactoryPattern(jarContent));
-        
+
         // Detect Builder pattern
         patterns.addAll(detectBuilderPattern(jarContent));
-        
+
         // Detect Strategy pattern
         patterns.addAll(detectStrategyPattern(jarContent));
-        
+
         // Detect Observer pattern
         patterns.addAll(detectObserverPattern(jarContent));
-        
+
+        // Detect Repository pattern (as design pattern)
+        patterns.addAll(detectRepositoryDesignPattern(jarContent));
+
         return patterns;
     }
     
@@ -390,12 +417,12 @@ public class JavassistArchitecturalPatternAnalyzer implements ArchitecturalPatte
     
     private List<DetectedAntiPattern> detectLongParameterListAntiPattern(JarContent jarContent) {
         List<DetectedAntiPattern> longParameterLists = new ArrayList<>();
-        
+
         for (ClassInfo classInfo : jarContent.getClasses()) {
             for (MethodInfo method : classInfo.getMethods()) {
                 if (hasLongParameterList(method)) {
                     longParameterLists.add(DetectedAntiPattern.builder()
-                        .antiPatternType(AntiPatternType.MIXED_CONCERNS)
+                        .antiPatternType(AntiPatternType.INAPPROPRIATE_INTIMACY)
                         .severity(ViolationSeverity.MEDIUM)
                         .description("Method with excessive parameters: " + method.getName())
                         .addAffectedClass(classInfo.getFullyQualifiedName() + "." + method.getName())
@@ -404,7 +431,7 @@ public class JavassistArchitecturalPatternAnalyzer implements ArchitecturalPatte
                 }
             }
         }
-        
+
         return longParameterLists;
     }
     

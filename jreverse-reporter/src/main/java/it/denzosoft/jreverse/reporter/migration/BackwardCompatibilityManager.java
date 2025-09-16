@@ -30,11 +30,11 @@ public class BackwardCompatibilityManager {
     
     private static void initializeLegacyMappings() {
         // Original reports that have enhanced versions
-        LEGACY_TO_ENHANCED_MAPPINGS.put(ReportType.REST_CONTROLLERS_MAP, ReportType.REST_ENDPOINTS_MAP_ENHANCED);
-        LEGACY_TO_ENHANCED_MAPPINGS.put(ReportType.AUTOWIRING_GRAPH, ReportType.COMPREHENSIVE_ENTRY_POINTS);
-        LEGACY_TO_ENHANCED_MAPPINGS.put(ReportType.ASYNC_SEQUENCES, ReportType.ASYNC_SEQUENCES_COMPLETE);
-        LEGACY_TO_ENHANCED_MAPPINGS.put(ReportType.SECURITY_ANNOTATIONS, ReportType.SECURITY_ANNOTATIONS_ENHANCED);
-        LEGACY_TO_ENHANCED_MAPPINGS.put(ReportType.HTTP_CALL_GRAPH, ReportType.HTTP_CALL_GRAPH_ENHANCED);
+        LEGACY_TO_ENHANCED_MAPPINGS.put(ReportType.REST_CONTROLLER_MAP, ReportType.REST_ENDPOINT_MAP);
+        LEGACY_TO_ENHANCED_MAPPINGS.put(ReportType.AUTOWIRING_GRAPH, ReportType.EVENT_LISTENER_ANALYSIS);
+        LEGACY_TO_ENHANCED_MAPPINGS.put(ReportType.ASYNC_CALL_SEQUENCES, ReportType.ASYNC_PROCESSING_ANALYSIS);
+        LEGACY_TO_ENHANCED_MAPPINGS.put(ReportType.SECURITY_ANNOTATIONS, ReportType.SECURITY_ENTRYPOINT_MATRIX);
+        LEGACY_TO_ENHANCED_MAPPINGS.put(ReportType.HTTP_CALL_GRAPH, ReportType.EVENT_DRIVEN_ANALYSIS);
         
         LOGGER.info("Initialized legacy mappings for " + LEGACY_TO_ENHANCED_MAPPINGS.size() + " report types");
     }
@@ -100,25 +100,25 @@ public class BackwardCompatibilityManager {
      */
     private static String getFeatureFlagForReportType(ReportType reportType) {
         switch (reportType) {
-            case REST_ENDPOINTS_MAP_ENHANCED:
+            case REST_ENDPOINT_MAP:
                 return "enhanced_rest_endpoints";
-            case COMPREHENSIVE_ENTRY_POINTS:
+            case EVENT_LISTENER_ANALYSIS:
                 return "comprehensive_entry_points";
-            case SECURITY_ANNOTATIONS_ENHANCED:
+            case SECURITY_ANNOTATIONS:
                 return "enhanced_security_annotations";
-            case HTTP_CALL_GRAPH_ENHANCED:
+            case HTTP_CALL_GRAPH:
                 return "enhanced_call_graph";
-            case ASYNC_SEQUENCES_COMPLETE:
+            case ASYNC_CALL_SEQUENCES:
                 return "complete_async_sequences";
             case SCHEDULED_TASKS_ANALYSIS:
                 return "scheduled_tasks_analysis";
-            case MESSAGE_LISTENERS_CATALOG:
+            case MESSAGING_INTEGRATION_ANALYSIS:
                 return "message_listeners_catalog";
-            case EVENT_DRIVEN_ARCHITECTURE:
+            case EVENT_DRIVEN_ANALYSIS:
                 return "event_driven_architecture";
-            case ASYNC_OPERATIONS_ANALYSIS:
+            case ASYNC_PROCESSING_ANALYSIS:
                 return "async_operations_analysis";
-            case CROSS_ENTRYPOINT_SECURITY:
+            case SECURITY_ENTRYPOINT_MATRIX:
                 return "cross_entrypoint_security";
             default:
                 return null;
@@ -223,7 +223,7 @@ public class BackwardCompatibilityManager {
     
     private static String[] getEnhancementFeatures(ReportType enhancedType) {
         switch (enhancedType) {
-            case REST_ENDPOINTS_MAP_ENHANCED:
+            case REST_ENDPOINT_MAP:
                 return new String[]{
                     "Security annotations integration (@PreAuthorize, @PostAuthorize)",
                     "Correlation with scheduled tasks and message listeners",
@@ -231,7 +231,7 @@ public class BackwardCompatibilityManager {
                     "Interactive filtering and search capabilities",
                     "Cross-entrypoint relationship visualization"
                 };
-            case COMPREHENSIVE_ENTRY_POINTS:
+            case EVENT_LISTENER_ANALYSIS:
                 return new String[]{
                     "Unified view of all entry points (REST, Scheduled, Messaging, Events)",
                     "Cross-entrypoint correlations and dependencies",
@@ -239,7 +239,7 @@ public class BackwardCompatibilityManager {
                     "Performance impact analysis per entry point category",
                     "Interactive correlation highlighting"
                 };
-            case SECURITY_ANNOTATIONS_ENHANCED:
+            case SECURITY_ANNOTATIONS:
                 return new String[]{
                     "Cross-entrypoint security analysis",
                     "Correlation between security annotations and other entry points",

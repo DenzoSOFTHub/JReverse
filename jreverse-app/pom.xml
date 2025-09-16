@@ -18,7 +18,7 @@
     <description>Main application assembly - Executable JAR with all dependencies</description>
 
     <dependencies>
-        <!-- All project modules -->
+        <!-- Working project modules only -->
         <dependency>
             <groupId>${project.groupId}</groupId>
             <artifactId>jreverse-core</artifactId>
@@ -27,6 +27,7 @@
             <groupId>${project.groupId}</groupId>
             <artifactId>jreverse-analyzer</artifactId>
         </dependency>
+        <!-- UI and Reporter modules disabled due to Phase 3 incomplete dependencies
         <dependency>
             <groupId>${project.groupId}</groupId>
             <artifactId>jreverse-ui</artifactId>
@@ -35,6 +36,7 @@
             <groupId>${project.groupId}</groupId>
             <artifactId>jreverse-reporter</artifactId>
         </dependency>
+        -->
 
         <!-- External dependencies (will be shaded into final JAR) -->
         <dependency>

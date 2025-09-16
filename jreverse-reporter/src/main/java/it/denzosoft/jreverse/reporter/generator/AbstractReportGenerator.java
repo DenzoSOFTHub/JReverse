@@ -205,8 +205,8 @@ public abstract class AbstractReportGenerator {
     /**
      * Returns whether this generator requires specific analysis results.
      */
-    protected boolean requiresSchedulingAnalysis() { return false; }
-    protected boolean requiresAsyncAnalysis() { return false; }
-    protected boolean requiresMessagingAnalysis() { return false; }
-    protected boolean requiresSecurityAnalysis() { return false; }
+    public boolean requiresSchedulingAnalysis() { return false; }
+    public boolean requiresAsyncAnalysis() { return false; }
+    public boolean requiresMessagingAnalysis() { return false; }
+    public boolean requiresSecurityAnalysis() { return false; }
 }

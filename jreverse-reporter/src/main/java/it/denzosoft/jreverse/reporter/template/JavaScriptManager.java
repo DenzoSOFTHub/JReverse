@@ -112,15 +112,15 @@ public class JavaScriptManager {
      */
     public String getReportSpecificScripts(ReportType reportType) {
         switch (reportType) {
-            case REST_ENDPOINTS_MAP_ENHANCED:
+            case REST_ENDPOINT_MAP:
                 return getRestEndpointsScripts();
-            case HTTP_CALL_GRAPH_ENHANCED:
+            case HTTP_CALL_GRAPH:
                 return getCallGraphScripts();
             case SCHEDULED_TASKS_ANALYSIS:
                 return getScheduledTasksScripts();
-            case MESSAGE_LISTENERS_CATALOG:
+            case MESSAGING_INTEGRATION_ANALYSIS:
                 return getMessageListenersScripts();
-            case COMPREHENSIVE_ENTRY_POINTS:
+            case EVENT_LISTENER_ANALYSIS:
                 return getEntryPointsScripts();
             default:
                 return "";

@@ -18,7 +18,7 @@ public class ReportGeneratorFactory {
         // Original reports
         GENERATOR_SUPPLIERS.put(ReportType.PACKAGE_CLASS_MAP, ArchitectureOverviewGenerator::new);
         GENERATOR_SUPPLIERS.put(ReportType.UML_CLASS_DIAGRAM, ClassSummaryGenerator::new);
-        GENERATOR_SUPPLIERS.put(ReportType.PACKAGE_DEPENDENCIES, DependencyAnalysisGenerator::new);
+        GENERATOR_SUPPLIERS.put(ReportType.PACKAGE_DEPENDENCIES, PackageAnalysisReportGenerator::new);
         GENERATOR_SUPPLIERS.put(ReportType.MODULE_DEPENDENCIES, PackageStructureGenerator::new);
         GENERATOR_SUPPLIERS.put(ReportType.BOOTSTRAP_ANALYSIS, BootstrapAnalysisReportGenerator::new);
         

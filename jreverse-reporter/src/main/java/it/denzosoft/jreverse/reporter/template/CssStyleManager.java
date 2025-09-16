@@ -269,11 +269,11 @@ public class CssStyleManager {
         switch (reportType) {
             case BOOTSTRAP_ANALYSIS:
                 return getBootstrapSpecificStyles();
-            case REST_ENDPOINTS_MAP_ENHANCED:
+            case REST_ENDPOINT_MAP:
                 return getRestEndpointsSpecificStyles();
             case SCHEDULED_TASKS_ANALYSIS:
                 return getScheduledTasksSpecificStyles();
-            case MESSAGE_LISTENERS_CATALOG:
+            case MESSAGING_INTEGRATION_ANALYSIS:
                 return getMessageListenersSpecificStyles();
             default:
                 return "";

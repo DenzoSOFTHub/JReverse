@@ -94,4 +94,11 @@ public enum BeanScope {
     public boolean isMultiInstance() {
         return this != SINGLETON;
     }
+
+    /**
+     * Alias for fromScopeName for backward compatibility.
+     */
+    public static BeanScope fromString(String scopeName) {
+        return fromScopeName(scopeName);
+    }
 }

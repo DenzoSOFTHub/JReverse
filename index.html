@@ -1,0 +1,484 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>JReverse Analysis Reports - contrp.be-springboot-22.2.57.jar</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Arial', sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .header {
+            background: white;
+            border-radius: 15px;
+            padding: 40px;
+            margin-bottom: 40px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            text-align: center;
+        }
+
+        .header h1 {
+            color: #2c3e50;
+            font-size: 3em;
+            margin-bottom: 10px;
+            background: linear-gradient(45deg, #667eea, #764ba2);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .header .subtitle {
+            color: #7f8c8d;
+            font-size: 1.3em;
+            margin-bottom: 20px;
+        }
+
+        .jar-info {
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 20px;
+            margin-top: 20px;
+            border-left: 5px solid #667eea;
+        }
+
+        .reports-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 30px;
+            margin-bottom: 40px;
+        }
+
+        .report-card {
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+            border-left: 6px solid transparent;
+            text-decoration: none;
+            color: inherit;
+        }
+
+        .report-card:hover {
+            transform: translateY(-10px);
+            box-shadow: 0 20px 40px rgba(0,0,0,0.15);
+        }
+
+        .report-card.analysis {
+            border-left-color: #3498db;
+        }
+
+        .report-card.technical {
+            border-left-color: #9b59b6;
+        }
+
+        .report-card.security {
+            border-left-color: #e74c3c;
+        }
+
+        .report-icon {
+            font-size: 3em;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+
+        .report-title {
+            font-size: 1.5em;
+            font-weight: bold;
+            margin-bottom: 15px;
+            color: #2c3e50;
+        }
+
+        .report-description {
+            color: #7f8c8d;
+            margin-bottom: 20px;
+            line-height: 1.6;
+        }
+
+        .report-stats {
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 20px;
+        }
+
+        .report-stats .stat {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 8px;
+        }
+
+        .report-stats .stat:last-child {
+            margin-bottom: 0;
+        }
+
+        .stat-label {
+            color: #2c3e50;
+            font-weight: 600;
+        }
+
+        .stat-value {
+            color: #667eea;
+            font-weight: bold;
+        }
+
+        .report-button {
+            background: linear-gradient(45deg, #667eea, #764ba2);
+            color: white;
+            padding: 12px 25px;
+            border-radius: 25px;
+            text-decoration: none;
+            font-weight: bold;
+            display: inline-block;
+            transition: all 0.3s ease;
+            text-align: center;
+            width: 100%;
+        }
+
+        .report-button:hover {
+            background: linear-gradient(45deg, #764ba2, #667eea);
+            transform: scale(1.05);
+        }
+
+        .summary-section {
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            margin-bottom: 30px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+        }
+
+        .summary-section h2 {
+            color: #2c3e50;
+            margin-bottom: 20px;
+            font-size: 1.8em;
+        }
+
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin: 20px 0;
+        }
+
+        .metric-card {
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 20px;
+            text-align: center;
+            border-left: 4px solid #667eea;
+        }
+
+        .metric-value {
+            font-size: 2em;
+            font-weight: bold;
+            color: #667eea;
+        }
+
+        .metric-label {
+            color: #2c3e50;
+            font-weight: 600;
+            margin-top: 5px;
+        }
+
+        .footer {
+            background: white;
+            border-radius: 15px;
+            padding: 20px;
+            text-align: center;
+            color: #7f8c8d;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.1);
+        }
+
+        .analysis-badge {
+            display: inline-block;
+            padding: 5px 15px;
+            border-radius: 15px;
+            font-size: 0.9em;
+            font-weight: bold;
+            margin: 5px;
+        }
+
+        .badge-success { background: #d4edda; color: #155724; }
+        .badge-warning { background: #fff3cd; color: #856404; }
+        .badge-info { background: #d1ecf1; color: #0c5460; }
+
+        @media (max-width: 768px) {
+            .container {
+                padding: 10px;
+            }
+
+            .header h1 {
+                font-size: 2em;
+            }
+
+            .reports-grid {
+                grid-template-columns: 1fr;
+                gap: 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <h1>📊 JReverse Analysis Reports</h1>
+            <div class="subtitle">Comprehensive Analysis of contrp.be-springboot-22.2.57.jar</div>
+
+            <div class="jar-info">
+                <div class="stat">
+                    <span class="stat-label">📁 JAR File:</span>
+                    <span class="stat-value">contrp.be-springboot-22.2.57.jar</span>
+                </div>
+                <div class="stat">
+                    <span class="stat-label">📊 File Size:</span>
+                    <span class="stat-value">137.1 MB</span>
+                </div>
+                <div class="stat">
+                    <span class="stat-label">🏗️ Application Type:</span>
+                    <span class="stat-value">Spring Boot JAR</span>
+                </div>
+                <div class="stat">
+                    <span class="stat-label">⚡ Analysis Time:</span>
+                    <span class="stat-value">~1 second</span>
+                </div>
+            </div>
+
+            <div style="margin-top: 20px;">
+                <span class="analysis-badge badge-success">✅ Layered Architecture</span>
+                <span class="analysis-badge badge-success">✅ Domain-Driven Design</span>
+                <span class="analysis-badge badge-warning">⚠️ Security Issues</span>
+                <span class="analysis-badge badge-info">ℹ️ 1,373 Classes</span>
+            </div>
+        </div>
+
+        <!-- Analysis Summary -->
+        <div class="summary-section">
+            <h2>📋 Analysis Summary</h2>
+
+            <div class="metrics-grid">
+                <div class="metric-card">
+                    <div class="metric-value">1,373</div>
+                    <div class="metric-label">Total Classes</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-value">98</div>
+                    <div class="metric-label">Packages</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-value">30/100</div>
+                    <div class="metric-label">Architecture Score</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-value">0</div>
+                    <div class="metric-label">Security Annotations</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-value">6</div>
+                    <div class="metric-label">Design Patterns</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-value">0</div>
+                    <div class="metric-label">Circular Dependencies</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Reports Grid -->
+        <div class="reports-grid">
+            <!-- Analysis Report -->
+            <a href="contrp-analysis-report.html" class="report-card analysis">
+                <div class="report-icon">📊</div>
+                <div class="report-title">Comprehensive Analysis Report</div>
+                <div class="report-description">
+                    Complete overview of the application architecture, including package structure,
+                    design patterns, and quality metrics with visual presentations and recommendations.
+                </div>
+                <div class="report-stats">
+                    <div class="stat">
+                        <span class="stat-label">Focus:</span>
+                        <span class="stat-value">Architecture & Quality</span>
+                    </div>
+                    <div class="stat">
+                        <span class="stat-label">Format:</span>
+                        <span class="stat-value">Visual Dashboard</span>
+                    </div>
+                    <div class="stat">
+                        <span class="stat-label">Size:</span>
+                        <span class="stat-value">24 KB</span>
+                    </div>
+                </div>
+                <div class="report-button">View Analysis Report</div>
+            </a>
+
+            <!-- Technical Report -->
+            <a href="contrp-technical-report.html" class="report-card technical">
+                <div class="report-icon">🔧</div>
+                <div class="report-title">Technical Deep Dive</div>
+                <div class="report-description">
+                    Detailed technical analysis with code metrics, dependency relationships,
+                    architectural patterns, and development recommendations for technical stakeholders.
+                </div>
+                <div class="report-stats">
+                    <div class="stat">
+                        <span class="stat-label">Focus:</span>
+                        <span class="stat-value">Technical Details</span>
+                    </div>
+                    <div class="stat">
+                        <span class="stat-label">Format:</span>
+                        <span class="stat-value">Technical Documentation</span>
+                    </div>
+                    <div class="stat">
+                        <span class="stat-label">Size:</span>
+                        <span class="stat-value">23 KB</span>
+                    </div>
+                </div>
+                <div class="report-button">View Technical Report</div>
+            </a>
+
+            <!-- Security Report -->
+            <a href="contrp-security-report.html" class="report-card security">
+                <div class="report-icon">🔒</div>
+                <div class="report-title">Security Assessment</div>
+                <div class="report-description">
+                    Critical security analysis identifying vulnerabilities, missing security controls,
+                    and providing prioritized recommendations for security improvements.
+                </div>
+                <div class="report-stats">
+                    <div class="stat">
+                        <span class="stat-label">Focus:</span>
+                        <span class="stat-value">Security & Compliance</span>
+                    </div>
+                    <div class="stat">
+                        <span class="stat-label">Risk Level:</span>
+                        <span class="stat-value" style="color: #e74c3c;">HIGH</span>
+                    </div>
+                    <div class="stat">
+                        <span class="stat-label">Size:</span>
+                        <span class="stat-value">19 KB</span>
+                    </div>
+                </div>
+                <div class="report-button" style="background: linear-gradient(45deg, #e74c3c, #c0392b);">View Security Report</div>
+            </a>
+        </div>
+
+        <!-- Key Findings -->
+        <div class="summary-section">
+            <h2>🔍 Key Findings</h2>
+
+            <div class="reports-grid">
+                <div style="background: #e8f5e8; padding: 20px; border-radius: 10px; border-left: 5px solid #27ae60;">
+                    <h3 style="color: #27ae60; margin-bottom: 15px;">✅ Strengths</h3>
+                    <ul style="color: #2c3e50;">
+                        <li>Well-organized layered architecture</li>
+                        <li>Domain-driven design implementation</li>
+                        <li>Good class size distribution (100% small classes)</li>
+                        <li>No circular dependencies detected</li>
+                        <li>Clear package structure with 98 packages</li>
+                        <li>Spring Boot best practices followed</li>
+                    </ul>
+                </div>
+
+                <div style="background: #fff3cd; padding: 20px; border-radius: 10px; border-left: 5px solid #f39c12;">
+                    <h3 style="color: #f39c12; margin-bottom: 15px;">⚠️ Areas for Improvement</h3>
+                    <ul style="color: #2c3e50;">
+                        <li>Critical: No security annotations found</li>
+                        <li>Low abstraction level (0.4%)</li>
+                        <li>Package naming compliance only 6.1%</li>
+                        <li>Architecture maturity score 30/100</li>
+                        <li>Limited design pattern usage (6 instances)</li>
+                        <li>35 unprotected controller classes</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <!-- Analysis Details -->
+        <div class="summary-section">
+            <h2>📈 Analysis Performance</h2>
+            <p>JReverse successfully analyzed a <strong>137.1 MB Spring Boot JAR</strong> containing <strong>1,373 classes</strong>
+            across <strong>98 packages</strong> in approximately <strong>1 second</strong> using only <strong>32 MB of memory</strong> (0.4% utilization).
+            The analysis utilized <strong>8 specialized analyzers</strong> to provide comprehensive insights into architecture, security,
+            and code quality.</p>
+
+            <div style="background: #f0f9ff; padding: 20px; border-radius: 10px; margin-top: 20px; border-left: 5px solid #3498db;">
+                <h3 style="color: #3498db; margin-bottom: 15px;">🚀 Technologies Detected</h3>
+                <div style="display: flex; flex-wrap: wrap; gap: 10px;">
+                    <span class="analysis-badge badge-info">Spring Boot 22.2.57</span>
+                    <span class="analysis-badge badge-info">Spring Framework</span>
+                    <span class="analysis-badge badge-info">JPA/Hibernate</span>
+                    <span class="analysis-badge badge-info">REST Controllers</span>
+                    <span class="analysis-badge badge-info">WSDL Clients</span>
+                    <span class="analysis-badge badge-info">External Integrations</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <div class="footer">
+            <p><strong>Generated by JReverse v1.1.0</strong></p>
+            <p>Java Reverse Engineering Tool - Enhanced Analysis Suite</p>
+            <p>Analysis completed: <script>document.write(new Date().toLocaleString());</script></p>
+            <p><em>Reports generated with 8 specialized analyzers in Phase 3 configuration</em></p>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Add hover animations
+            const reportCards = document.querySelectorAll('.report-card');
+            reportCards.forEach(card => {
+                card.addEventListener('mouseenter', function() {
+                    this.style.transform = 'translateY(-10px) scale(1.02)';
+                });
+                card.addEventListener('mouseleave', function() {
+                    this.style.transform = 'translateY(0) scale(1)';
+                });
+            });
+
+            // Add click analytics (optional)
+            reportCards.forEach(card => {
+                card.addEventListener('click', function() {
+                    console.log('Report accessed:', this.querySelector('.report-title').textContent);
+                });
+            });
+
+            // Animate metric values on load
+            const metricValues = document.querySelectorAll('.metric-value');
+            metricValues.forEach(metric => {
+                const finalValue = metric.textContent;
+                if (!isNaN(parseInt(finalValue))) {
+                    let currentValue = 0;
+                    const increment = Math.ceil(parseInt(finalValue) / 50);
+                    const timer = setInterval(() => {
+                        currentValue += increment;
+                        if (currentValue >= parseInt(finalValue)) {
+                            currentValue = parseInt(finalValue);
+                            clearInterval(timer);
+                        }
+                        metric.textContent = currentValue;
+                    }, 20);
+                }
+            });
+        });
+    </script>
+</body>
+</html>
